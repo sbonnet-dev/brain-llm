@@ -66,6 +66,47 @@ Every error is returned with the following JSON envelope:
 }
 ```
 
+## Provider types
+
+The allowed values for the `provider_type` field when creating a provider can
+be discovered at runtime:
+
+```
+GET /api/v1/providers/types
+```
+
+Supported values: `ollama`, `vllm`, `openai_compatible`.
+
+## Running an agent or a team
+
+```
+POST /api/v1/agents/{agent_id}/run
+POST /api/v1/teams/{team_id}/run
+```
+
+Body:
+
+```json
+{
+  "message": "Summarize the latest news about AI.",
+  "session_id": "optional-session-id",
+  "user_id": "optional-user-id",
+  "extra": {}
+}
+```
+
+Response:
+
+```json
+{
+  "id": 1,
+  "kind": "agent",
+  "content": "...",
+  "run_id": "...",
+  "metrics": {}
+}
+```
+
 ## Postman collection
 
 ```

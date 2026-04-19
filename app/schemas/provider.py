@@ -8,6 +8,16 @@ from pydantic import BaseModel, ConfigDict, Field
 # The provider_type drives which Agno model class is used at runtime.
 ProviderType = Literal["ollama", "vllm", "openai_compatible"]
 
+PROVIDER_TYPES: tuple[str, ...] = ("ollama", "vllm", "openai_compatible")
+
+
+class ProviderTypeInfo(BaseModel):
+    """Description of a supported provider_type value."""
+
+    value: str = Field(..., description="Identifier to use in the 'provider_type' field")
+    label: str = Field(..., description="Human-friendly label")
+    description: str = Field(..., description="What this provider_type is for")
+
 
 class ProviderBase(BaseModel):
     """Shared provider fields."""
