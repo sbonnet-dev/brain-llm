@@ -14,12 +14,18 @@ def build_postman_collection(app: FastAPI) -> dict[str, Any]:
     openapi = app.openapi()
     base_url = settings.public_base_url.rstrip("/")
 
-    items: list[dict[str, Any]] = []
+    groups: dict[str, list[dict[str, Any]]] = {}
     for path, methods in openapi.get("paths", {}).items():
         for method, op in methods.items():
             if method.lower() not in {"get", "post", "put", "patch", "delete"}:
                 continue
-            items.append(_build_request_item(base_url, path, method, op))
+            folder = _folder_for(op, path)
+            item = _build_request_item(base_url, path, method, op)
+            groups.setdefault(folder, []).append(item)
+
+    folders = [
+        {"name": name, "item": groups[name]} for name in sorted(groups)
+    ]
 
     return {
         "info": {
@@ -28,9 +34,23 @@ def build_postman_collection(app: FastAPI) -> dict[str, Any]:
             "description": openapi.get("info", {}).get("description", "brain-llm API"),
             "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
         },
-        "item": items,
+        "item": folders,
         "variable": [{"key": "baseUrl", "value": base_url}],
     }
+
+
+def _folder_for(op: dict, path: str) -> str:
+    """Pick the folder name for an operation: OpenAPI tag, else path prefix."""
+    tags = op.get("tags") or []
+    if tags:
+        return str(tags[0])
+
+    for segment in path.strip("/").split("/"):
+        if segment and not segment.startswith("{"):
+            if segment not in {"api", "v1"}:
+                return segment
+    return "default"
+
 
 
 def _build_request_item(base_url: str, path: str, method: str, op: dict) -> dict[str, Any]:
