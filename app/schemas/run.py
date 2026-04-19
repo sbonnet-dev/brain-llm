@@ -17,6 +17,15 @@ class RunRequest(BaseModel):
         None,
         description="Optional user identifier forwarded to the Agno runtime.",
     )
+    stream: bool = Field(
+        False,
+        description=(
+            "If true, the response is streamed as Server-Sent Events "
+            "(text/event-stream). Each event is a JSON object "
+            "`{\"content\": \"...\"}` followed by a final "
+            "`{\"done\": true}` marker."
+        ),
+    )
     extra: dict[str, Any] | None = Field(
         None,
         description="Additional keyword arguments forwarded to Agent/Team .run().",
