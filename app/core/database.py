@@ -2,7 +2,7 @@
 
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import MetaData, create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import get_settings
@@ -17,24 +17,33 @@ engine = create_engine(
     future=True,
 )
 
-# For SQLite, enable FK enforcement (required for CASCADE deletes to work).
+# SQLite does not support named schemas — use None to keep tables in
+# the default schema.  PostgreSQL and other engines use "brain".
+_DB_SCHEMA: str | None = (
+    None if _settings.database_url.startswith("sqlite") else "brain"
+)
+
+# For SQLite, enable FK enforcement so CASCADE deletes work correctly.
 if _settings.database_url.startswith("sqlite"):
+
     @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_conn, _):
+    def _set_sqlite_pragma(dbapi_conn, _):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
+
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
 
 
 class Base(DeclarativeBase):
-    """Declarative base class for ORM models.
+    """Declarative base for all ORM models.
 
-    All tables are created in the 'brain' schema (or ignored for SQLite).
+    Tables are placed in the 'brain' schema on PostgreSQL (and any other
+    engine that supports named schemas).  SQLite uses the default schema.
     """
 
-    schema = "brain"
+    metadata = MetaData(schema=_DB_SCHEMA)
 
 
 def get_db() -> Iterator[Session]:
@@ -47,14 +56,14 @@ def get_db() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Create schema and all tables. Called at application startup."""
-    # For PostgreSQL, ensure the 'brain' schema exists.
-    if not _settings.database_url.startswith("sqlite"):
+    """Create the schema (if needed) and all tables at application startup."""
+    if _DB_SCHEMA is not None:
         with engine.connect() as conn:
-            conn.execute(text("CREATE SCHEMA IF NOT EXISTS brain"))
+            conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {_DB_SCHEMA}"))
             conn.commit()
 
-    # Import models so that they are registered on the metadata.
+    # Import every ORM module so its classes are registered on Base.metadata
+    # before create_all() is called.
     from app.models import (  # noqa: F401  pylint: disable=import-outside-toplevel
         agent,
         knowledge,

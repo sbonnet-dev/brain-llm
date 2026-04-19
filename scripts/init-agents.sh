@@ -36,13 +36,38 @@ need python3
 
 # -------- helpers ----------------------------------------------------------
 
+# Run curl and print the response body on error then exit.
+api_get() {
+    local url="$1"
+    local body
+    body=$(curl -sS -w "\n%{http_code}" "$url")
+    local http_code="${body##*$'\n'}"
+    local response="${body%$'\n'*}"
+    if [ "$http_code" -ge 400 ]; then
+        fail "GET $url returned HTTP $http_code: $response"
+    fi
+    printf '%s' "$response"
+}
+
+api_post() {
+    local url="$1" payload="$2"
+    local body
+    body=$(curl -sS -w "\n%{http_code}" -X POST "$url" \
+        -H "Content-Type: application/json" -d "$payload")
+    local http_code="${body##*$'\n'}"
+    local response="${body%$'\n'*}"
+    if [ "$http_code" -ge 400 ]; then
+        fail "POST $url returned HTTP $http_code: $response"
+    fi
+    printf '%s' "$response"
+}
+
 # Extract an integer field from a JSON object on stdin.
 json_int() {
     python3 -c "import sys, json; print(json.load(sys.stdin).get('$1', ''))"
 }
 
 # Find the first object in a JSON array whose 'name' equals $1.
-# Prints the matched id or nothing if no match.
 find_id_by_name() {
     local needle="$1"
     python3 -c "
@@ -68,21 +93,17 @@ print(match['id'] if match else '')
 # -------- 1. health check --------------------------------------------------
 
 log "Checking API availability at $BASE_URL/health ..."
-if ! curl -fsS "$BASE_URL/health" >/dev/null; then
-    fail "API is not reachable at $BASE_URL/health"
-fi
+api_get "$BASE_URL/health" >/dev/null
 log "API is up."
 
 # -------- 2. provider ------------------------------------------------------
 
 log "Looking for existing provider '$PROVIDER_NAME' ..."
-PROVIDER_ID=$(curl -fsS "$BASE_URL/api/v1/providers" | find_id_by_name "$PROVIDER_NAME")
+PROVIDER_ID=$(api_get "$BASE_URL/api/v1/providers" | find_id_by_name "$PROVIDER_NAME")
 
 if [ -z "$PROVIDER_ID" ]; then
     log "Creating Ollama provider '$PROVIDER_NAME' -> $OLLAMA_URL"
-    PROVIDER_ID=$(curl -fsS -X POST "$BASE_URL/api/v1/providers" \
-        -H "Content-Type: application/json" \
-        -d "$(cat <<JSON
+    PROVIDER_ID=$(api_post "$BASE_URL/api/v1/providers" "$(cat <<JSON
 {
   "name": "$PROVIDER_NAME",
   "provider_type": "ollama",
@@ -99,13 +120,11 @@ log "Provider ready (id=$PROVIDER_ID)."
 # -------- 3. model ---------------------------------------------------------
 
 log "Looking for existing model '$MODEL_NAME' on provider $PROVIDER_ID ..."
-MODEL_ID=$(curl -fsS "$BASE_URL/api/v1/models" | find_model_id "$MODEL_NAME" "$PROVIDER_ID")
+MODEL_ID=$(api_get "$BASE_URL/api/v1/models" | find_model_id "$MODEL_NAME" "$PROVIDER_ID")
 
 if [ -z "$MODEL_ID" ]; then
     log "Registering model '$MODEL_NAME' (llm) on provider $PROVIDER_ID ..."
-    MODEL_ID=$(curl -fsS -X POST "$BASE_URL/api/v1/models" \
-        -H "Content-Type: application/json" \
-        -d "$(cat <<JSON
+    MODEL_ID=$(api_post "$BASE_URL/api/v1/models" "$(cat <<JSON
 {
   "name": "$MODEL_NAME",
   "model_type": "llm",
@@ -121,13 +140,11 @@ log "Model ready (id=$MODEL_ID)."
 # -------- 4. agent ---------------------------------------------------------
 
 log "Looking for existing agent '$AGENT_NAME' ..."
-AGENT_ID=$(curl -fsS "$BASE_URL/api/v1/agents" | find_id_by_name "$AGENT_NAME")
+AGENT_ID=$(api_get "$BASE_URL/api/v1/agents" | find_id_by_name "$AGENT_NAME")
 
 if [ -z "$AGENT_ID" ]; then
     log "Creating agent '$AGENT_NAME' ..."
-    AGENT_ID=$(curl -fsS -X POST "$BASE_URL/api/v1/agents" \
-        -H "Content-Type: application/json" \
-        -d "$(cat <<JSON
+    AGENT_ID=$(api_post "$BASE_URL/api/v1/agents" "$(cat <<JSON
 {
   "name": "$AGENT_NAME",
   "role": "General purpose assistant",
