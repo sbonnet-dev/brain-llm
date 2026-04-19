@@ -57,6 +57,16 @@ def get_db() -> Iterator[Session]:
 
 def init_db() -> None:
     """Create the schema (if needed) and all tables at application startup."""
+    # For SQLite, ensure the parent directory exists before the engine tries
+    # to open the file — SQLAlchemy won't create intermediate directories.
+    if _settings.database_url.startswith("sqlite"):
+        import os
+
+        db_path = _settings.database_url.split("sqlite:///", 1)[-1]
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+
     if _DB_SCHEMA is not None:
         with engine.connect() as conn:
             conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {_DB_SCHEMA}"))

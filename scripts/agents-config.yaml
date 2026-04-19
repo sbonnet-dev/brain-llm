@@ -1,0 +1,51 @@
+# brain-llm bootstrap configuration
+#
+# This file is consumed by scripts/init-agents.py to seed the API with
+# providers, models, agents and teams.  Re-running the script is safe:
+# every resource is looked up by name first and only created if absent.
+#
+# Reference another resource by its name in the same file:
+#   models[].provider  → name of an entry in providers[]
+#   agents[].model     → name of an entry in models[]
+#   agents[].provider  → needed to disambiguate when the same model name
+#                        exists on several providers
+#   teams[].model / teams[].provider → same convention as agents
+
+providers:
+  - name: ollama-local
+    provider_type: ollama           # ollama | vllm | openai_compatible
+    base_url: http://localhost:11434
+    default_model: llama3.2:latest
+    description: Local Ollama server
+
+models:
+  - name: llama3.2:latest
+    model_type: llm                 # llm | vlm | embedder | reranker | audio
+    provider: ollama-local
+    description: Llama 3.2 (3B) served by Ollama
+
+agents:
+  - name: Assistant
+    role: General purpose assistant
+    description: Default assistant powered by llama3.2:latest
+    instructions: You are a helpful assistant. Answer concisely and accurately.
+    model: llama3.2:latest
+    provider: ollama-local
+    # tool_ids: []
+    # knowledge_ids: []
+    # extra_config:
+    #   markdown: true
+    #   show_tool_calls: false
+
+teams: []
+# teams:
+#   - name: ResearchTeam
+#     mode: coordinate              # coordinate | route | collaborate
+#     description: Team that coordinates multiple agents
+#     instructions: Coordinate agents to answer the user's question thoroughly.
+#     model: llama3.2:latest        # leader model (optional)
+#     provider: ollama-local
+#     members:
+#       - Assistant
+#     # tool_ids: []
+#     # knowledge_ids: []
