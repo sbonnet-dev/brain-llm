@@ -45,6 +45,14 @@ def test_providers_crud_roundtrip() -> None:
     assert deleted.json()["deleted"] is True
 
 
+def test_provider_types_catalog() -> None:
+    """The provider_type catalog exposes exactly the three supported values."""
+    response = client.get("/api/v1/providers/types")
+    assert response.status_code == 200
+    values = [entry["value"] for entry in response.json()]
+    assert values == ["ollama", "vllm", "openai_compatible"]
+
+
 def test_postman_collection() -> None:
     """Postman collection endpoint returns a v2.1 envelope."""
     response = client.get("/api/v1/postman/collection")

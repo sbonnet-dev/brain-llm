@@ -31,7 +31,7 @@ def list_providers(
     "/{provider_id}",
     response_model=ProviderRead,
     responses=_ERROR_RESPONSES,
-    summary="Get a provider",
+    summary="Get a provider by id",
 )
 def get_provider(provider_id: int, db: Session = Depends(get_db)) -> ProviderRead:
     """Fetch a single provider by id."""
