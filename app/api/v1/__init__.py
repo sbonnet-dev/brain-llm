@@ -4,7 +4,6 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     agents,
-    inference,
     knowledges,
     postman,
     provider_types,
@@ -20,5 +19,4 @@ router.include_router(tools.router)
 router.include_router(knowledges.router)
 router.include_router(agents.router)
 router.include_router(teams.router)
-router.include_router(inference.router)
 router.include_router(postman.router)
