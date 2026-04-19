@@ -22,7 +22,7 @@ def test_providers_crud_roundtrip() -> None:
     """Exercise the providers CRUD lifecycle end to end."""
     payload = {
         "name": "local-ollama-test",
-        "kind": "ollama",
+        "provider_type": "ollama",
         "base_url": "http://localhost:11434",
         "default_model": "llama3",
     }

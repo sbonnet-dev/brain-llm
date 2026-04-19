@@ -5,14 +5,18 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ProviderKind = Literal["ollama", "vllm", "openai", "openai_compatible"]
+# The provider_type drives which Agno model class is used at runtime.
+ProviderType = Literal["ollama", "vllm", "openai_compatible"]
 
 
 class ProviderBase(BaseModel):
     """Shared provider fields."""
 
     name: str = Field(..., min_length=1, max_length=128)
-    kind: ProviderKind
+    provider_type: ProviderType = Field(
+        ...,
+        description="Backend type powering this provider.",
+    )
     base_url: str = Field(..., min_length=1)
     api_key: str | None = None
     default_model: str | None = None
@@ -27,7 +31,7 @@ class ProviderUpdate(BaseModel):
     """Payload for updating a provider (all fields optional)."""
 
     name: str | None = Field(None, min_length=1, max_length=128)
-    kind: ProviderKind | None = None
+    provider_type: ProviderType | None = None
     base_url: str | None = None
     api_key: str | None = None
     default_model: str | None = None

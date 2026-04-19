@@ -20,8 +20,8 @@ class Provider(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
 
-    # Supported kinds: "ollama", "vllm", "openai", "openai_compatible".
-    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Supported provider types: "ollama", "vllm", "openai_compatible".
+    provider_type: Mapped[str] = mapped_column(String(32), nullable=False)
 
     base_url: Mapped[str] = mapped_column(String(512), nullable=False)
     api_key: Mapped[str | None] = mapped_column(String(512), nullable=True)

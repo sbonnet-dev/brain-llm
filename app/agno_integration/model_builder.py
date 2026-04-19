@@ -1,10 +1,9 @@
 """Build Agno model instances from stored Provider records.
 
-Supports:
-* Ollama       -> ``agno.models.ollama.Ollama``
-* VLLM         -> ``agno.models.vllm.VLLM`` (falls back to OpenAI-compatible)
-* OpenAI       -> ``agno.models.openai.OpenAIChat``
-* OpenAI-compatible generic -> ``agno.models.openai.like.OpenAILike``
+Supports three provider types:
+* ``ollama``             -> ``agno.models.ollama.Ollama``
+* ``vllm``               -> ``agno.models.vllm.VLLM`` (falls back to OpenAI-compatible)
+* ``openai_compatible``  -> ``agno.models.openai.like.OpenAILike``
 """
 
 from typing import Any
@@ -24,24 +23,29 @@ def build_model(provider: Provider, model_id: str | None = None) -> Any:
             f"No model specified and provider '{provider.name}' has no default_model"
         )
 
-    logger.debug("Building model kind=%s model=%s", provider.kind, model_name)
+    logger.debug(
+        "Building model provider_type=%s model=%s", provider.provider_type, model_name
+    )
 
     builders = {
         "ollama": _build_ollama,
         "vllm": _build_vllm,
-        "openai": _build_openai,
         "openai_compatible": _build_openai_like,
     }
 
     try:
-        builder = builders[provider.kind]
+        builder = builders[provider.provider_type]
     except KeyError as exc:
-        raise ProviderError(f"Unsupported provider kind: {provider.kind}") from exc
+        raise ProviderError(
+            f"Unsupported provider_type: {provider.provider_type}"
+        ) from exc
 
     try:
         return builder(provider, model_name)
     except ImportError as exc:
-        raise ProviderError(f"Agno dependency missing for {provider.kind}: {exc}") from exc
+        raise ProviderError(
+            f"Agno dependency missing for {provider.provider_type}: {exc}"
+        ) from exc
     except Exception as exc:  # pragma: no cover - defensive
         raise ProviderError(f"Failed to build model for {provider.name}: {exc}") from exc
 
@@ -62,15 +66,12 @@ def _build_vllm(provider: Provider, model_id: str) -> Any:
     return VLLM(id=model_id, base_url=provider.base_url, api_key=provider.api_key or "EMPTY")
 
 
-def _build_openai(provider: Provider, model_id: str) -> Any:
-    """Build an OpenAI-backed Agno model."""
-    from agno.models.openai import OpenAIChat  # type: ignore
-
-    return OpenAIChat(id=model_id, base_url=provider.base_url, api_key=provider.api_key)
-
-
 def _build_openai_like(provider: Provider, model_id: str) -> Any:
-    """Build a generic OpenAI-compatible Agno model."""
+    """Build a generic OpenAI-compatible Agno model.
+
+    Use this type for OpenAI itself, Together, Groq, LM Studio, vLLM OpenAI
+    servers, or any other endpoint that speaks the OpenAI Chat Completions API.
+    """
     from agno.models.openai.like import OpenAILike  # type: ignore
 
     return OpenAILike(
