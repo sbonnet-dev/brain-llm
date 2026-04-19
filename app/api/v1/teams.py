@@ -5,9 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.common import DeleteResponse, ErrorResponse
-from app.schemas.run import RunRequest, RunResponse
 from app.schemas.team import TeamCreate, TeamRead, TeamUpdate
-from app.services.run_service import run_team
 from app.services.team_service import team_service
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -16,7 +14,6 @@ _ERROR_RESPONSES = {
     400: {"model": ErrorResponse},
     404: {"model": ErrorResponse},
     409: {"model": ErrorResponse},
-    502: {"model": ErrorResponse},
 }
 
 
@@ -77,22 +74,3 @@ def update_team(
 def delete_team(team_id: int, db: Session = Depends(get_db)) -> DeleteResponse:
     """Delete a team by id."""
     return DeleteResponse(id=team_service.delete(db, team_id))
-
-
-@router.post(
-    "/{team_id}/run",
-    response_model=RunResponse,
-    responses=_ERROR_RESPONSES,
-    summary="Execute a team",
-    description=(
-        "Build the Agno team from its stored configuration (leader + members), "
-        "run the provided message and return the generated answer."
-    ),
-)
-def execute_team(
-    team_id: int,
-    payload: RunRequest,
-    db: Session = Depends(get_db),
-) -> RunResponse:
-    """Run a team synchronously and return the result."""
-    return run_team(db, team_id, payload)

@@ -6,9 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.schemas.agent import AgentCreate, AgentRead, AgentUpdate
 from app.schemas.common import DeleteResponse, ErrorResponse
-from app.schemas.run import RunRequest, RunResponse
 from app.services.agent_service import agent_service
-from app.services.run_service import run_agent
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -16,7 +14,6 @@ _ERROR_RESPONSES = {
     400: {"model": ErrorResponse},
     404: {"model": ErrorResponse},
     409: {"model": ErrorResponse},
-    502: {"model": ErrorResponse},
 }
 
 
@@ -77,22 +74,3 @@ def update_agent(
 def delete_agent(agent_id: int, db: Session = Depends(get_db)) -> DeleteResponse:
     """Delete an agent by id."""
     return DeleteResponse(id=agent_service.delete(db, agent_id))
-
-
-@router.post(
-    "/{agent_id}/run",
-    response_model=RunResponse,
-    responses=_ERROR_RESPONSES,
-    summary="Execute an agent",
-    description=(
-        "Build the Agno agent from its stored configuration, run the provided "
-        "message and return the generated answer."
-    ),
-)
-def execute_agent(
-    agent_id: int,
-    payload: RunRequest,
-    db: Session = Depends(get_db),
-) -> RunResponse:
-    """Run an agent synchronously and return the result."""
-    return run_agent(db, agent_id, payload)
