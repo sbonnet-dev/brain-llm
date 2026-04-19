@@ -13,8 +13,7 @@ class AgentBase(BaseModel):
     role: str | None = None
     description: str | None = None
     instructions: str | None = None
-    provider_id: int
-    model: str = Field(..., min_length=1)
+    model_id: int
     tool_ids: list[int] | None = None
     knowledge_ids: list[int] | None = None
     extra_config: dict[str, Any] | None = None
@@ -31,8 +30,7 @@ class AgentUpdate(BaseModel):
     role: str | None = None
     description: str | None = None
     instructions: str | None = None
-    provider_id: int | None = None
-    model: str | None = None
+    model_id: int | None = None
     tool_ids: list[int] | None = None
     knowledge_ids: list[int] | None = None
     extra_config: dict[str, Any] | None = None

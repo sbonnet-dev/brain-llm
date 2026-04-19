@@ -15,8 +15,7 @@ class TeamBase(BaseModel):
     description: str | None = None
     mode: TeamMode = "coordinate"
     instructions: str | None = None
-    provider_id: int | None = None
-    model: str | None = None
+    model_id: int | None = None
     member_agent_ids: list[int] | None = None
     tool_ids: list[int] | None = None
     knowledge_ids: list[int] | None = None
@@ -34,8 +33,7 @@ class TeamUpdate(BaseModel):
     description: str | None = None
     mode: TeamMode | None = None
     instructions: str | None = None
-    provider_id: int | None = None
-    model: str | None = None
+    model_id: int | None = None
     member_agent_ids: list[int] | None = None
     tool_ids: list[int] | None = None
     knowledge_ids: list[int] | None = None

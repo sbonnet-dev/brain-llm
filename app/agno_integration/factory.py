@@ -14,6 +14,7 @@ from app.core.exceptions import NotFoundError
 from app.core.logging_config import get_logger
 from app.models.agent import Agent as AgentModel
 from app.models.knowledge import Knowledge
+from app.models.model import Model
 from app.models.provider import Provider
 from app.models.team import Team as TeamModel
 from app.models.tool import Tool
@@ -25,11 +26,10 @@ def build_agno_agent(db: Session, agent_row: AgentModel) -> Any:
     """Translate an Agent DB record into a runnable ``agno.agent.Agent``."""
     from agno.agent import Agent as AgnoAgent  # type: ignore
 
-    provider = db.get(Provider, agent_row.provider_id)
-    if provider is None:
-        raise NotFoundError(f"Provider id={agent_row.provider_id} not found for agent {agent_row.id}")
+    model_row = _must_get(db, Model, agent_row.model_id, "Model")
+    provider = _must_get(db, Provider, model_row.provider_id, "Provider")
 
-    model = build_model(provider, agent_row.model)
+    model = build_model(provider, model_row.name)
     tools = _resolve_tools(db, agent_row.tool_ids or [])
     knowledge = _resolve_first_knowledge(db, agent_row.knowledge_ids or [])
 
@@ -60,8 +60,10 @@ def build_agno_team(db: Session, team_row: TeamModel) -> Any:
     ]
 
     leader_model = None
-    if team_row.provider_id is not None and team_row.model is not None:
-        leader_model = build_model(_must_get(db, Provider, team_row.provider_id, "Provider"), team_row.model)
+    if team_row.model_id is not None:
+        model_row = _must_get(db, Model, team_row.model_id, "Model")
+        provider = _must_get(db, Provider, model_row.provider_id, "Provider")
+        leader_model = build_model(provider, model_row.name)
 
     tools = _resolve_tools(db, team_row.tool_ids or [])
     knowledge = _resolve_first_knowledge(db, team_row.knowledge_ids or [])

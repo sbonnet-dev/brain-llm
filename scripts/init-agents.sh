@@ -7,7 +7,7 @@
 #      base_url=http://localhost:11434).
 #   3. Register the model "llama3.2:latest" (model_type=llm) on that
 #      provider if it is not already registered.
-#   4. Create an agent named "Assistant" using this provider/model pair.
+#   4. Create an agent named "Assistant" referencing that model by id.
 #
 # The script is idempotent: re-running it will reuse any existing
 # provider, model or agent that matches the expected name.
@@ -150,8 +150,7 @@ if [ -z "$AGENT_ID" ]; then
   "role": "General purpose assistant",
   "description": "Default assistant powered by $MODEL_NAME on $PROVIDER_NAME",
   "instructions": "You are a helpful assistant. Answer concisely and accurately.",
-  "provider_id": $PROVIDER_ID,
-  "model": "$MODEL_NAME"
+  "model_id": $MODEL_ID
 }
 JSON
 )" | json_int id)

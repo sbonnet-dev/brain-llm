@@ -19,10 +19,9 @@ class Agent(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    provider_id: Mapped[int] = mapped_column(
-        ForeignKey("providers.id", ondelete="RESTRICT"), nullable=False
+    model_id: Mapped[int] = mapped_column(
+        ForeignKey("models.id", ondelete="RESTRICT"), nullable=False
     )
-    model: Mapped[str] = mapped_column(String(128), nullable=False)
 
     # Lists of tool ids and knowledge ids attached to this agent.
     tool_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)

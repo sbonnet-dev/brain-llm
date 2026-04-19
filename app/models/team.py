@@ -23,10 +23,9 @@ class Team(Base):
     instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Leader model used by the team coordinator.
-    provider_id: Mapped[int | None] = mapped_column(
-        ForeignKey("providers.id", ondelete="SET NULL"), nullable=True
+    model_id: Mapped[int | None] = mapped_column(
+        ForeignKey("models.id", ondelete="SET NULL"), nullable=True
     )
-    model: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     member_agent_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
     tool_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
