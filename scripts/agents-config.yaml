@@ -12,19 +12,38 @@
 #   teams[].model / teams[].provider → same convention as agents
 
 providers:
+  - name: mistral
+    provider_type: openai_compatible  # ollama | vllm | openai_compatible
+    base_url: https://api.mistral.ai/v1/
+    api_key: A71WFyNG22SSsVcO40eo6Siw22
+    default_model: mistral-small-latest
+    description: Mistral AI — OpenAI-compatible endpoint
+
   - name: ollama-local
-    provider_type: ollama           # ollama | vllm | openai_compatible
+    provider_type: ollama
     base_url: http://localhost:11434
     default_model: llama3.2:latest
     description: Local Ollama server
 
 models:
+  - name: mistral-small-latest
+    model_type: llm                   # llm | vlm | embedder | reranker | audio
+    provider: mistral
+    description: Mistral Small (latest) served via the Mistral API
+
   - name: llama3.2:latest
-    model_type: llm                 # llm | vlm | embedder | reranker | audio
+    model_type: llm
     provider: ollama-local
     description: Llama 3.2 (3B) served by Ollama
 
 agents:
+  - name: MistralAssistant
+    role: General purpose assistant
+    description: Default assistant powered by mistral-small-latest
+    instructions: You are a helpful assistant. Answer concisely and accurately.
+    model: mistral-small-latest
+    provider: mistral
+
   - name: Assistant
     role: General purpose assistant
     description: Default assistant powered by llama3.2:latest
