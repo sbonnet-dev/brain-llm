@@ -5,13 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.common import DeleteResponse, ErrorResponse
-from app.schemas.provider import (
-    ProviderCreate,
-    ProviderRead,
-    ProviderTypeInfo,
-    ProviderUpdate,
-)
-from app.services.provider_service import list_provider_types, provider_service
+from app.schemas.provider import ProviderCreate, ProviderRead, ProviderUpdate
+from app.services.provider_service import provider_service
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
@@ -20,20 +15,6 @@ _ERROR_RESPONSES = {
     404: {"model": ErrorResponse},
     409: {"model": ErrorResponse},
 }
-
-
-@router.get(
-    "/types",
-    response_model=list[ProviderTypeInfo],
-    summary="List supported provider_type values",
-    description=(
-        "Return the list of values accepted by the 'provider_type' field when "
-        "creating or updating a provider."
-    ),
-)
-def get_provider_types() -> list[ProviderTypeInfo]:
-    """Return the static catalog of supported provider types."""
-    return list_provider_types()
 
 
 @router.get("", response_model=list[ProviderRead], summary="List providers")
