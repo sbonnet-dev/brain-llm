@@ -39,6 +39,7 @@ def init_db() -> None:
     from app.models import (  # noqa: F401  pylint: disable=import-outside-toplevel
         agent,
         knowledge,
+        model,
         provider,
         team,
         tool,
