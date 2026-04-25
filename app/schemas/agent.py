@@ -6,6 +6,25 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class SuggestionBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=256)
+    icon: str | None = Field(None, max_length=128)
+    prompt: str = Field(..., min_length=1)
+
+
+class SuggestionCreate(SuggestionBase):
+    """Suggestion payload (used inside AgentCreate / AgentUpdate)."""
+
+
+class SuggestionRead(SuggestionBase):
+    """Suggestion as returned by the API."""
+
+    id: int
+    agent_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AgentBase(BaseModel):
     """Shared agent fields."""
 
@@ -17,6 +36,7 @@ class AgentBase(BaseModel):
     tool_ids: list[int] | None = None
     knowledge_ids: list[int] | None = None
     extra_config: dict[str, Any] | None = None
+    suggestions: list[SuggestionCreate] | None = None
 
 
 class AgentCreate(AgentBase):
@@ -34,12 +54,14 @@ class AgentUpdate(BaseModel):
     tool_ids: list[int] | None = None
     knowledge_ids: list[int] | None = None
     extra_config: dict[str, Any] | None = None
+    suggestions: list[SuggestionCreate] | None = None
 
 
 class AgentRead(AgentBase):
     """Agent as returned by the API."""
 
     id: int
+    suggestions: list[SuggestionRead] = []
     created_at: datetime
     updated_at: datetime
 
