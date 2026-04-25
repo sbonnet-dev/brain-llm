@@ -34,6 +34,8 @@ def build_agno_agent(db: Session, agent_row: AgentModel) -> Any:
     knowledge = _resolve_first_knowledge(db, agent_row.knowledge_ids or [])
 
     kwargs: dict[str, Any] = dict(agent_row.extra_config or {})
+    kwargs.pop("is_active", None)
+    kwargs.pop("group_ids", None)
     if agent_row.role is not None:
         kwargs.setdefault("role", agent_row.role)
     if agent_row.description is not None:
@@ -69,6 +71,8 @@ def build_agno_team(db: Session, team_row: TeamModel) -> Any:
     knowledge = _resolve_first_knowledge(db, team_row.knowledge_ids or [])
 
     kwargs: dict[str, Any] = dict(team_row.extra_config or {})
+    kwargs.pop("is_active", None)
+    kwargs.pop("group_ids", None)
     if team_row.description is not None:
         kwargs.setdefault("description", team_row.description)
     if team_row.instructions is not None:

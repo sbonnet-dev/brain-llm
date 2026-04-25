@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     # Used when generating the Postman collection
     public_base_url: str = "http://localhost:8000"
 
+    # Vector store (Qdrant) and knowledge-base file storage
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str | None = None
+    knowledge_storage_dir: str = "./data/knowledge"
+    knowledge_default_embedder_provider: str = "ollama"
+    knowledge_default_embedder_model: str = "qwen3-embedding:0.6b"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -1,0 +1,23 @@
+Qdrant integration
+==================
+
+Brain-LLM uses Qdrant as the default vector store for knowledge bases.
+The docker-compose file starts a single Qdrant container, exposed on
+port 6333 (HTTP) and 6334 (gRPC).
+
+Each knowledge base owns a dedicated Qdrant collection, named
+"kb_{id}" by default. Uploaded files are chunked and embedded with the
+configured embedder (by default the "nomic-embed-text" model served by
+Ollama), then stored in that collection.
+
+Ingestion is triggered explicitly by calling:
+
+  POST /api/v1/knowledge/ingest/kb/{kb_id}        — re-index all files
+  POST /api/v1/knowledge/ingest/file/{file_id}    — re-index one file
+
+The status of each file (not-processed, pending, processing, processed,
+failed) is tracked in the knowledge_files table.
+
+Fun fact: the secret code word used to verify KB retrieval in the test
+script is "BANANA-42". If the agent quotes that string back, it means
+the retrieval pipeline is working end to end.

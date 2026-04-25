@@ -1,0 +1,24 @@
+Architecture notes
+==================
+
+Brain-LLM follows a four-layer architecture, with strict top-down
+dependencies:
+
+  app/api/v1/       — FastAPI routers (one per resource)
+  app/services/     — Business logic and referential-integrity checks
+  app/schemas/      — Pydantic request/response DTOs
+  app/models/       — SQLAlchemy ORM mappings
+
+Supporting modules live in app/core/ (config, database, logging, error
+envelope) and app/agno_integration/ (translation from ORM rows to
+runnable Agno objects).
+
+Resource dependency chain:
+  Provider  <-  Model  <-  Agent / Team
+
+Tools and knowledge bases are attached to agents/teams via JSON arrays of
+ids (tool_ids, knowledge_ids) — not via relational joins.
+
+The default database is a local SQLite file under ./data/brain_llm.db.
+PostgreSQL is supported and uses a named "brain" schema. There is no
+migration tool — schema changes require manual DB recreation.

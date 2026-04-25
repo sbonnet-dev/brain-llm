@@ -20,7 +20,7 @@ class Agent(Base):
     instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     model_id: Mapped[int] = mapped_column(
-        ForeignKey("models.id", ondelete="RESTRICT"), nullable=False
+        ForeignKey("models.id", ondelete="CASCADE"), nullable=False
     )
 
     # Lists of tool ids and knowledge ids attached to this agent.

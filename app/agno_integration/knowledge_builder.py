@@ -1,70 +1,155 @@
-"""Build Agno knowledge bases from stored Knowledge records."""
+"""Build Agno knowledge bases from stored KnowledgeBase records.
+
+The vector store is Qdrant by default. Each KB owns one Qdrant collection
+whose name is ``kb.collection_name`` (``kb_{id}`` if unset).
+"""
+
+from __future__ import annotations
 
 from typing import Any
 
 from app.core.exceptions import ValidationError
 from app.core.logging_config import get_logger
-from app.models.knowledge import Knowledge
+from app.models.knowledge import Knowledge, KnowledgeFile
 
 logger = get_logger(__name__)
 
 
-def build_knowledge(knowledge: Knowledge) -> Any:
-    """Instantiate an Agno knowledge base for ``knowledge``.
-
-    The concrete Agno class depends on the source type. We only import
-    the relevant module lazily to keep startup fast.
-    """
-    sources = knowledge.sources or []
-    vector_db = _build_vector_db(knowledge.vector_db)
-
-    if knowledge.source_type == "url":
-        from agno.knowledge.url import UrlKnowledge  # type: ignore
-
-        return UrlKnowledge(urls=sources, vector_db=vector_db)
-
-    if knowledge.source_type == "pdf":
-        from agno.knowledge.pdf import PDFKnowledgeBase  # type: ignore
-
-        return PDFKnowledgeBase(path=sources[0] if sources else None, vector_db=vector_db)
-
-    if knowledge.source_type == "text":
-        from agno.knowledge.text import TextKnowledgeBase  # type: ignore
-
-        return TextKnowledgeBase(path=sources[0] if sources else None, vector_db=vector_db)
-
-    if knowledge.source_type == "markdown":
-        from agno.knowledge.markdown import MarkdownKnowledgeBase  # type: ignore
-
-        return MarkdownKnowledgeBase(path=sources[0] if sources else None, vector_db=vector_db)
-
-    if knowledge.source_type == "website":
-        from agno.knowledge.website import WebsiteKnowledgeBase  # type: ignore
-
-        return WebsiteKnowledgeBase(urls=sources, vector_db=vector_db)
-
-    raise ValidationError(f"Unsupported knowledge source_type: {knowledge.source_type}")
+# ---------------------------------------------------------------------------
+# Vector store
+# ---------------------------------------------------------------------------
 
 
-def _build_vector_db(config: dict | None) -> Any | None:
-    """Instantiate the vector database described by ``config`` if provided."""
-    if not config:
-        return None
+def build_vector_db(config: dict | None) -> Any:
+    """Return an Agno vector-db instance for ``config`` (defaults to Qdrant)."""
+    cfg = dict(config or {})
+    db_type = (cfg.pop("type", "qdrant") or "qdrant").lower()
 
-    db_type = config.get("type", "").lower()
-    options = {k: v for k, v in config.items() if k != "type"}
+    if db_type == "qdrant":
+        from agno.vectordb.qdrant import Qdrant  # type: ignore
+
+        collection = cfg.pop("collection", None) or cfg.pop("collection_name", None)
+        if not collection:
+            raise ValidationError("Qdrant configuration requires a 'collection' name")
+        # Agno's Qdrant accepts `url`, `api_key`, `https`, `prefix`, ...
+        return Qdrant(collection=collection, **cfg)
 
     if db_type == "lancedb":
         from agno.vectordb.lancedb import LanceDb  # type: ignore
 
-        return LanceDb(**options)
+        return LanceDb(**cfg)
+
     if db_type == "pgvector":
         from agno.vectordb.pgvector import PgVector  # type: ignore
 
-        return PgVector(**options)
+        return PgVector(**cfg)
+
     if db_type == "chromadb":
         from agno.vectordb.chroma import ChromaDb  # type: ignore
 
-        return ChromaDb(**options)
+        return ChromaDb(**cfg)
 
     raise ValidationError(f"Unsupported vector_db type: {db_type}")
+
+
+# ---------------------------------------------------------------------------
+# Embedder
+# ---------------------------------------------------------------------------
+
+
+def build_embedder(config: dict | None) -> Any | None:
+    """Instantiate an Agno embedder from a generic ``{provider, model, ...}`` dict."""
+    if not config:
+        return None
+
+    cfg = dict(config)
+    provider = (cfg.pop("provider", "") or "").lower()
+    model = cfg.pop("model", None)
+
+    if not provider or not model:
+        return None
+
+    if provider == "ollama":
+        from agno.knowledge.embedder.ollama import OllamaEmbedder  # type: ignore
+
+        return OllamaEmbedder(id=model, **cfg)
+
+    if provider == "openai":
+        from agno.knowledge.embedder.openai import OpenAIEmbedder  # type: ignore
+
+        return OpenAIEmbedder(id=model, **cfg)
+
+    if provider in {"mistral", "openai_compatible"}:
+        # Mistral exposes an OpenAI-compatible embeddings API.
+        from agno.knowledge.embedder.openai import OpenAIEmbedder  # type: ignore
+
+        return OpenAIEmbedder(id=model, **cfg)
+
+    logger.warning("Unknown embedder provider '%s' — falling back to default", provider)
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Knowledge bases
+# ---------------------------------------------------------------------------
+
+
+def build_knowledge(knowledge: Knowledge) -> Any:
+    """Build a runnable Agno Knowledge instance for ``knowledge``.
+
+    This wires the KB to its Qdrant collection so that an agent using it can
+    perform similarity searches, but does not ingest anything.
+    """
+    from app.services.knowledge_service import (
+        resolve_embedder_config,
+        resolve_vector_db_config,
+    )
+
+    vector_cfg = resolve_vector_db_config(knowledge)
+    embedder_cfg = resolve_embedder_config(knowledge)
+
+    embedder = build_embedder(embedder_cfg)
+    if embedder is not None:
+        # Pass the embedder to the vector DB so Qdrant uses it for queries too.
+        vector_cfg["embedder"] = embedder
+
+    vector_db = build_vector_db(vector_cfg)
+
+    try:
+        from agno.knowledge.knowledge import Knowledge as AgnoKnowledge  # type: ignore
+
+        return AgnoKnowledge(
+            name=knowledge.name,
+            description=knowledge.description,
+            vector_db=vector_db,
+        )
+    except ImportError:
+        # Older Agno layouts expose a generic knowledge base under a different path.
+        from agno.knowledge.text import TextKnowledgeBase  # type: ignore
+
+        return TextKnowledgeBase(vector_db=vector_db)
+
+
+def ingest_file_into_kb(knowledge: Knowledge, file: KnowledgeFile) -> None:
+    """Load ``file`` into the KB's vector store."""
+    kb = build_knowledge(knowledge)
+    path = file.storage_path
+
+    # Agno's newer Knowledge class exposes add_content(path=...).
+    if hasattr(kb, "add_content"):
+        kb.add_content(path=path, name=file.filename)
+        return
+
+    # Fall back to the older `.load()` style used by *KnowledgeBase classes.
+    if hasattr(kb, "load_document"):
+        kb.load_document(path=path)
+        return
+    if hasattr(kb, "load"):
+        kb.path = path  # type: ignore[attr-defined]
+        kb.load(recreate=False, upsert=True)  # type: ignore[attr-defined]
+        return
+
+    raise ValidationError(
+        "The installed Agno version does not expose a supported ingestion API "
+        "(expected Knowledge.add_content or *KnowledgeBase.load)."
+    )
