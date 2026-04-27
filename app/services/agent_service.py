@@ -1,8 +1,9 @@
 """CRUD service for agents."""
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ValidationError
+from app.core.exceptions import ConflictError, ValidationError
 from app.models.agent import Agent
 from app.models.knowledge import Knowledge
 from app.models.model import Model
@@ -24,8 +25,15 @@ class AgentService(CRUDBase[Agent, AgentCreate, AgentUpdate]):
             knowledge_ids=payload.knowledge_ids,
         )
         suggestions = payload.suggestions
-        clean = AgentCreate(**payload.model_dump(exclude={"suggestions"}))
-        agent = super().create(db, clean)
+        data = payload.model_dump(exclude={"suggestions"})
+        agent = Agent(**data)
+        db.add(agent)
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise ConflictError("Agent already exists or violates a constraint") from exc
+        db.refresh(agent)
         _replace_suggestions(db, agent, suggestions)
         return agent
 
