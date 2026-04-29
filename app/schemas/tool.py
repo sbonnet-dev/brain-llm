@@ -1,11 +1,11 @@
 """Pydantic schemas for tools."""
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ToolKind = Literal["builtin", "custom"]
+ToolKind = Literal["builtin", "custom", "python_file"]
 
 
 class ToolBase(BaseModel):
@@ -15,7 +15,11 @@ class ToolBase(BaseModel):
     kind: ToolKind
     reference: str = Field(..., min_length=1, max_length=256)
     description: str | None = None
-    config: dict[str, Any] | None = None
+    dependencies: str | None = Field(
+        None,
+        max_length=1024,
+        description="Comma-separated pip packages to install (e.g. 'yfinance,duckduckgo-search').",
+    )
 
 
 class ToolCreate(ToolBase):
@@ -29,7 +33,7 @@ class ToolUpdate(BaseModel):
     kind: ToolKind | None = None
     reference: str | None = None
     description: str | None = None
-    config: dict[str, Any] | None = None
+    dependencies: str | None = Field(None, max_length=1024)
 
 
 class ToolRead(ToolBase):

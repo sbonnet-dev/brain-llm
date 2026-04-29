@@ -25,7 +25,15 @@ _PROVIDER_TYPE_CATALOG: tuple[ProviderTypeInfo, ...] = (
         label="OpenAI-compatible",
         description=(
             "Any endpoint speaking the OpenAI Chat Completions API: OpenAI itself, "
-            "Groq, Together, LM Studio, Mistral, Azure OpenAI, ..."
+            "Groq, Together, LM Studio, Azure OpenAI, ..."
+        ),
+    ),
+    ProviderTypeInfo(
+        value="mistral",
+        label="Mistral",
+        description=(
+            "Mistral AI native API. Use this instead of openai_compatible for "
+            "api.mistral.ai — Mistral rejects the OpenAI tool payload format."
         ),
     ),
 )

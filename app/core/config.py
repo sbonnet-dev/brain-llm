@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str | None = None
     knowledge_storage_dir: str = "./data/knowledge"
+    tool_storage_dir: str = "./data/tools"
     knowledge_default_embedder_provider: str = "ollama"
     knowledge_default_embedder_model: str = "qwen3-embedding:0.6b"
 

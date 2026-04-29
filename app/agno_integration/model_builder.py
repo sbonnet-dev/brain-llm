@@ -31,6 +31,7 @@ def build_model(provider: Provider, model_id: str | None = None) -> Any:
         "ollama": _build_ollama,
         "vllm": _build_vllm,
         "openai_compatible": _build_openai_like,
+        "mistral": _build_mistral,
     }
 
     try:
@@ -64,6 +65,13 @@ def _build_vllm(provider: Provider, model_id: str) -> Any:
     except ImportError:
         return _build_openai_like(provider, model_id)
     return VLLM(id=model_id, base_url=provider.base_url, api_key=provider.api_key or "EMPTY")
+
+
+def _build_mistral(provider: Provider, model_id: str) -> Any:
+    """Build a Mistral-backed Agno model using the native Mistral SDK."""
+    from agno.models.mistral import MistralChat  # type: ignore
+
+    return MistralChat(id=model_id, api_key=provider.api_key)
 
 
 def _build_openai_like(provider: Provider, model_id: str) -> Any:
