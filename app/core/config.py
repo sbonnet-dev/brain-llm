@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     # Logging configuration (configurable via LOG_LEVEL env var)
     log_level: str = "INFO"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    log_use_colors: bool = True
+    log_api_calls: bool = True
+    # Comma-separated list of logger names that are always silenced (set to WARNING),
+    # regardless of LOG_LEVEL. These produce binary/unreadable spam.
+    log_silenced_loggers: str = (
+        "hpack,hpack.hpack,hpack.table,h2,h2.connection,h2.stream,"
+        "httpcore,httpcore.http11,httpcore.http2,httpcore.connection,"
+        "httpx,urllib3,urllib3.connectionpool,asyncio,"
+        "agno.telemetry,openai._base_client,openai._client"
+    )
 
     # Persistence
     database_url: str = "sqlite:///./data/brain_llm.db"

@@ -22,6 +22,55 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _instrument_search(vector_db: Any, collection: str) -> None:
+    """Wrap a vector-db's search methods so search results are logged at INFO."""
+
+    def _summarize(results: Any) -> str:
+        try:
+            items = list(results) if results is not None else []
+        except TypeError:
+            return repr(results)
+        parts = []
+        for i, doc in enumerate(items[:5]):
+            name = getattr(doc, "name", None) or getattr(doc, "id", None) or ""
+            score = getattr(doc, "score", None)
+            content = getattr(doc, "content", "") or ""
+            snippet = content[:120].replace("\n", " ")
+            score_s = f" score={score:.3f}" if isinstance(score, (int, float)) else ""
+            parts.append(f"  [{i}]{score_s} {name}: {snippet}")
+        more = f"\n  ... (+{len(items) - 5} more)" if len(items) > 5 else ""
+        return f"{len(items)} hit(s)\n" + "\n".join(parts) + more
+
+    for method_name in ("search", "async_search"):
+        original = getattr(vector_db, method_name, None)
+        if original is None or not callable(original):
+            continue
+
+        if method_name == "async_search":
+            async def _wrapped(*args, _orig=original, **kwargs):  # type: ignore
+                query = args[0] if args else kwargs.get("query", "")
+                results = await _orig(*args, **kwargs)
+                logger.info(
+                    "Qdrant search [%s] query=%r -> %s",
+                    collection, query, _summarize(results),
+                )
+                return results
+        else:
+            def _wrapped(*args, _orig=original, **kwargs):  # type: ignore
+                query = args[0] if args else kwargs.get("query", "")
+                results = _orig(*args, **kwargs)
+                logger.info(
+                    "Qdrant search [%s] query=%r -> %s",
+                    collection, query, _summarize(results),
+                )
+                return results
+
+        try:
+            setattr(vector_db, method_name, _wrapped)
+        except Exception:
+            pass
+
+
 def build_vector_db(config: dict | None) -> Any:
     """Return an Agno vector-db instance for ``config`` (defaults to Qdrant)."""
     cfg = dict(config or {})
@@ -34,7 +83,9 @@ def build_vector_db(config: dict | None) -> Any:
         if not collection:
             raise ValidationError("Qdrant configuration requires a 'collection' name")
         # Agno's Qdrant accepts `url`, `api_key`, `https`, `prefix`, ...
-        return Qdrant(collection=collection, **cfg)
+        vdb = Qdrant(collection=collection, **cfg)
+        _instrument_search(vdb, collection)
+        return vdb
 
     if db_type == "lancedb":
         from agno.vectordb.lancedb import LanceDb  # type: ignore
