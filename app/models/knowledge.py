@@ -5,12 +5,18 @@ attached to agents or teams. Each KnowledgeBase owns one or more
 KnowledgeFiles, which are the raw documents backing it.
 """
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.model import Model
 
 
 # Status ids match the spec exposed by /knowledge/status-types.
@@ -41,8 +47,12 @@ class Knowledge(Base):
     # Qdrant collection name — defaults to `kb_{id}` at creation time.
     collection_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    # Optional embedder config: {"provider": "ollama", "model": "nomic-embed-text", ...}
-    embedder: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # FK to the Model row (model_type="embedder") used to vectorize documents.
+    # Resolved to a runnable embedder via Model + Provider at query time.
+    embedder_model_id: Mapped[int | None] = mapped_column(
+        ForeignKey("models.id", ondelete="RESTRICT"), nullable=True
+    )
+    embedder_model: Mapped["Model | None"] = relationship("Model", lazy="joined")
 
     # Vector DB overrides: {"type": "qdrant", "url": "...", "api_key": "..."}
     vector_db: Mapped[dict | None] = mapped_column(JSON, nullable=True)

@@ -20,6 +20,10 @@ make docker-up        # docker compose up -d --build (brain-llm + ollama)
 make docker-logs      # tail brain-llm container logs
 make docker-down
 
+make migrate                      # alembic upgrade head
+make migrate-revision M="msg"     # alembic revision --autogenerate -m "msg"
+make migrate-stamp                # alembic stamp head (mark current state as up-to-date)
+
 # Run one test
 .venv/bin/pytest tests/test_smoke.py::test_health -v
 
@@ -61,7 +65,16 @@ Provider  ←—  Model  ←—  Agent / Team
 - Default: SQLite at `./data/brain_llm.db`; the `data/` directory is auto-created by `init_db()` since SQLAlchemy will not create intermediate directories.
 - PostgreSQL: tables live in a named `brain` schema (`Base.metadata = MetaData(schema="brain")`). SQLite falls back to the default schema. `init_db()` runs `CREATE SCHEMA IF NOT EXISTS brain` on non-SQLite engines.
 - SQLite has `PRAGMA foreign_keys=ON` enabled via an event listener so `ondelete=CASCADE/RESTRICT/SET NULL` actually fires.
-- Tables are created at startup via `Base.metadata.create_all()`. There is **no migration tool** — changing a column requires manual DB recreation (`make clean` wipes the SQLite file).
+- Tables are created at startup via `Base.metadata.create_all()` (idempotent — only creates missing tables) **and** via Alembic migrations under `alembic/versions/`. Alembic is the source of truth for schema changes; `create_all()` remains a convenience for fresh installs.
+
+### Migrations (Alembic)
+
+- Apply pending migrations: `make migrate` (= `alembic upgrade head`).
+- Add a new migration after editing ORM: `make migrate-revision M="describe change"`. Always review the generated file before committing.
+- Mark an existing DB as up-to-date without running anything (e.g. when introducing Alembic on a DB that already matches the ORM, or after a manual `ALTER`): `make migrate-stamp`.
+- Roll back one revision: `make migrate-down`.
+- The DB URL comes from `Settings.database_url` (env var `DATABASE_URL`); the placeholder in `alembic.ini` is overridden at runtime by `alembic/env.py`.
+- `env.py` puts both ORM tables and the `alembic_version` bookkeeping table in the `brain` schema on PostgreSQL; SQLite uses the default schema. SQLite migrations are rendered with `render_as_batch=True` so column-level ALTERs work.
 
 ### Running agents/teams
 

@@ -5,6 +5,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.model import ModelRead
+
 
 # ---------------------------------------------------------------------------
 # Knowledge Base
@@ -21,9 +23,12 @@ class KnowledgeBase(BaseModel):
         description="Qdrant collection name. Defaults to 'kb_{id}' if omitted.",
         max_length=128,
     )
-    embedder: dict[str, Any] | None = Field(
+    embedder_model_id: int | None = Field(
         None,
-        description='Embedder config, e.g. {"provider": "ollama", "model": "nomic-embed-text"}.',
+        description=(
+            "Id of the Model row (model_type='embedder') used to vectorize "
+            "documents. Falls back to env defaults when null."
+        ),
     )
     vector_db: dict[str, Any] | None = Field(
         None,
@@ -41,7 +46,7 @@ class KnowledgeUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=128)
     description: str | None = None
     collection_name: str | None = Field(None, max_length=128)
-    embedder: dict[str, Any] | None = None
+    embedder_model_id: int | None = None
     vector_db: dict[str, Any] | None = None
 
 
@@ -50,6 +55,10 @@ class KnowledgeRead(KnowledgeBase):
 
     id: int
     status_id: int
+    embedder_model: ModelRead | None = Field(
+        None,
+        description="Embedded snapshot of the linked embedder Model (provider, name, extra_config).",
+    )
     created_at: datetime
     updated_at: datetime
 

@@ -23,6 +23,8 @@ from app.models.knowledge import (
     Knowledge,
     KnowledgeFile,
 )
+from app.models.model import Model
+from app.models.provider import Provider
 from app.schemas.knowledge import KnowledgeCreate, KnowledgeUpdate
 from app.services.base import CRUDBase
 
@@ -38,6 +40,7 @@ class KnowledgeService(CRUDBase[Knowledge, KnowledgeCreate, KnowledgeUpdate]):
     """Knowledge-base CRUD with sensible defaults."""
 
     def create(self, db: Session, payload: KnowledgeCreate) -> Knowledge:
+        _validate_references(db, embedder_model_id=payload.embedder_model_id)
         item = super().create(db, payload)
         # Default the Qdrant collection name to `kb_{id}` when not provided.
         if not item.collection_name:
@@ -45,6 +48,10 @@ class KnowledgeService(CRUDBase[Knowledge, KnowledgeCreate, KnowledgeUpdate]):
             db.commit()
             db.refresh(item)
         return item
+
+    def update(self, db: Session, item_id: int, payload: KnowledgeUpdate) -> Knowledge:
+        _validate_references(db, embedder_model_id=payload.embedder_model_id)
+        return super().update(db, item_id, payload)
 
     def delete(self, db: Session, item_id: int) -> int:
         """Delete a KB: also wipe its files from disk and its Qdrant collection."""
@@ -275,7 +282,7 @@ class KnowledgeIngestionService:
         db.commit()
 
         try:
-            ingest_file_into_kb(kb, kf)
+            ingest_file_into_kb(db, kb, kf)
             kf.status_id = STATUS_PROCESSED
             db.commit()
         except Exception as exc:
@@ -327,10 +334,59 @@ def resolve_vector_db_config(kb: Knowledge) -> dict[str, Any]:
     return cfg
 
 
-def resolve_embedder_config(kb: Knowledge) -> dict[str, Any]:
-    """Return the effective embedder config for a KB (falls back to env defaults)."""
+def resolve_embedder_config(db: Session, kb: Knowledge) -> dict[str, Any]:
+    """Return the effective embedder config for a KB.
+
+    If ``kb.embedder_model_id`` is set, the dict is built from the linked
+    Model + Provider rows so that ``model.extra_config`` (dimensions, etc.)
+    and provider credentials are picked up automatically. Otherwise we fall
+    back to the env-defined defaults.
+    """
     settings = get_settings()
-    cfg = dict(kb.embedder or {})
-    cfg.setdefault("provider", settings.knowledge_default_embedder_provider)
-    cfg.setdefault("model", settings.knowledge_default_embedder_model)
+
+    if kb.embedder_model_id is None:
+        return {
+            "provider": settings.knowledge_default_embedder_provider,
+            "model": settings.knowledge_default_embedder_model,
+        }
+
+    model = db.get(Model, kb.embedder_model_id)
+    if model is None:
+        raise ValidationError(
+            f"Embedder model with id={kb.embedder_model_id} no longer exists"
+        )
+    provider = db.get(Provider, model.provider_id)
+    if provider is None:
+        raise ValidationError(
+            f"Provider with id={model.provider_id} no longer exists"
+        )
+
+    cfg: dict[str, Any] = {
+        "provider": provider.provider_type,
+        "model": model.name,
+    }
+    # OllamaEmbedder takes ``host``; OpenAI-compatible embedders take ``base_url`` + ``api_key``.
+    if provider.provider_type == "ollama":
+        cfg["host"] = provider.base_url
+    else:
+        cfg["base_url"] = provider.base_url
+        if provider.api_key:
+            cfg["api_key"] = provider.api_key
+    # Per-model overrides (dimensions, custom kwargs, …) win last.
+    if model.extra_config:
+        cfg.update(model.extra_config)
     return cfg
+
+
+def _validate_references(db: Session, *, embedder_model_id: int | None) -> None:
+    """Ensure the embedder Model exists and has model_type='embedder'."""
+    if embedder_model_id is None:
+        return
+    model = db.get(Model, embedder_model_id)
+    if model is None:
+        raise ValidationError(f"Model with id={embedder_model_id} does not exist")
+    if model.model_type != "embedder":
+        raise ValidationError(
+            f"Model id={embedder_model_id} has model_type='{model.model_type}', "
+            "expected 'embedder'"
+        )

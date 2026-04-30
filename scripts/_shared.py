@@ -80,9 +80,14 @@ def resolve_samples_dir(config_path: Path, kb_cfg: dict) -> Path:
 
 
 def kb_create_payload(kb_cfg: dict) -> dict[str, Any]:
-    """Convert a YAML knowledges[] entry into a KnowledgeCreate body."""
+    """Convert a YAML knowledges[] entry into a KnowledgeCreate body.
+
+    The caller is responsible for resolving the YAML ``embedder_model``
+    reference (``{model, provider}``) to an ``embedder_model_id`` before
+    POSTing — that lookup needs the model_id_map which lives in 1-init-agents.
+    """
     payload: dict[str, Any] = {"name": kb_cfg["name"]}
-    for key in ("description", "collection_name", "embedder", "vector_db"):
+    for key in ("description", "collection_name", "vector_db"):
         if key in kb_cfg and kb_cfg[key] is not None:
             payload[key] = kb_cfg[key]
     return payload

@@ -29,7 +29,7 @@ def build_agno_agent(db: Session, agent_row: AgentModel) -> Any:
     model_row = _must_get(db, Model, agent_row.model_id, "Model")
     provider = _must_get(db, Provider, model_row.provider_id, "Provider")
 
-    model = build_model(provider, model_row.name)
+    model = build_model(provider, model_row.name, model_row.extra_config)
     tools = _resolve_tools(db, agent_row.tool_ids or [])
     knowledge = _resolve_first_knowledge(db, agent_row.knowledge_ids or [])
 
@@ -65,7 +65,7 @@ def build_agno_team(db: Session, team_row: TeamModel) -> Any:
     if team_row.model_id is not None:
         model_row = _must_get(db, Model, team_row.model_id, "Model")
         provider = _must_get(db, Provider, model_row.provider_id, "Provider")
-        leader_model = build_model(provider, model_row.name)
+        leader_model = build_model(provider, model_row.name, model_row.extra_config)
 
     tools = _resolve_tools(db, team_row.tool_ids or [])
     knowledge = _resolve_first_knowledge(db, team_row.knowledge_ids or [])
@@ -108,7 +108,7 @@ def _resolve_first_knowledge(db: Session, ids: list[int]) -> Any | None:
     """Return the first knowledge base referenced, if any."""
     if not ids:
         return None
-    return build_knowledge(_must_get(db, Knowledge, ids[0], "Knowledge"))
+    return build_knowledge(db, _must_get(db, Knowledge, ids[0], "Knowledge"))
 
 
 def _must_get(db: Session, model: type, item_id: int, name: str) -> Any:

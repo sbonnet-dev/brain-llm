@@ -59,18 +59,18 @@ models:
     provider: ollama-external
     description: Qwen3 Embedding (8B) — external Ollama (used by KBs)
 
-# Knowledge bases. `embedder.provider` is the Agno embedder backend
-# ("ollama" | "openai" | …) and `embedder.host` is forwarded to the embedder
-# constructor so we can hit a non-default Ollama URL.
+# Knowledge bases. `embedder_model` references a row in `models[]` above
+# (matching by (model, provider) name pair); the script resolves it to an
+# `embedder_model_id` FK so provider/host/api_key/extra_config are all
+# inherited from that single source of truth.
 # `samples_dir` is resolved relative to this YAML file.
 knowledges:
   - name: brain-llm-docs
     description: Documentation indexed for the KB-backed assistant
     samples_dir: kb-samples
-    embedder:
-      provider: ollama
+    embedder_model:
       model: qwen3-embedding:0.6b
-      host: http://localhost:11434
+      provider: ollama-local
 
 agents:
   - name: MistralAssistant

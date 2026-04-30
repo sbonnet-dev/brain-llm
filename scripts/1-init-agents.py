@@ -105,15 +105,25 @@ def ensure_model(api: APIClient, cfg: dict, provider_id_map: dict[str, int]) -> 
     return created["id"]
 
 
-def ensure_knowledge(api: APIClient, cfg: dict) -> int:
+def ensure_knowledge(
+    api: APIClient,
+    cfg: dict,
+    model_id_map: dict[tuple[str, str], int],
+) -> int:
     """Create or update a knowledge base (KB) declared in the YAML."""
     payload = kb_create_payload(cfg)
+    embedder_ref = cfg.get("embedder_model")
+    if embedder_ref:
+        payload["embedder_model_id"] = _resolve_model_id(
+            embedder_ref["model"], embedder_ref["provider"], model_id_map
+        )
+
     name = payload["name"]
     kbs = api.get("/api/v1/knowledge/bases")
     existing = find_by_name(kbs, name)
 
     if existing:
-        # Update if embedder/vector_db drifted; the API uses PUT for KBs.
+        # Update if embedder_model_id/vector_db drifted; the API uses PUT for KBs.
         diff = {k: v for k, v in payload.items() if existing.get(k) != v and k != "name"}
         if diff:
             _log(f"Updating KB '{name}' fields: {sorted(diff)}")
@@ -258,7 +268,7 @@ def main() -> None:
 
     knowledge_id_map: dict[str, int] = {}
     for kcfg in config.get("knowledges") or []:
-        knowledge_id_map[kcfg["name"]] = ensure_knowledge(api, kcfg)
+        knowledge_id_map[kcfg["name"]] = ensure_knowledge(api, kcfg, model_id_map)
 
     agent_id_map: dict[str, int] = {}
     for acfg in config.get("agents") or []:

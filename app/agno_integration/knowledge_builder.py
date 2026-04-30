@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from app.core.exceptions import ValidationError
 from app.core.logging_config import get_logger
 from app.models.knowledge import Knowledge, KnowledgeFile
@@ -91,11 +93,12 @@ def build_embedder(config: dict | None) -> Any | None:
 # ---------------------------------------------------------------------------
 
 
-def build_knowledge(knowledge: Knowledge) -> Any:
+def build_knowledge(db: Session, knowledge: Knowledge) -> Any:
     """Build a runnable Agno Knowledge instance for ``knowledge``.
 
     This wires the KB to its Qdrant collection so that an agent using it can
-    perform similarity searches, but does not ingest anything.
+    perform similarity searches, but does not ingest anything. ``db`` is used
+    to resolve the linked embedder Model + Provider rows.
     """
     from app.services.knowledge_service import (
         resolve_embedder_config,
@@ -103,7 +106,7 @@ def build_knowledge(knowledge: Knowledge) -> Any:
     )
 
     vector_cfg = resolve_vector_db_config(knowledge)
-    embedder_cfg = resolve_embedder_config(knowledge)
+    embedder_cfg = resolve_embedder_config(db, knowledge)
 
     embedder = build_embedder(embedder_cfg)
     if embedder is not None:
@@ -127,9 +130,9 @@ def build_knowledge(knowledge: Knowledge) -> Any:
         return TextKnowledgeBase(vector_db=vector_db)
 
 
-def ingest_file_into_kb(knowledge: Knowledge, file: KnowledgeFile) -> None:
+def ingest_file_into_kb(db: Session, knowledge: Knowledge, file: KnowledgeFile) -> None:
     """Load ``file`` into the KB's vector store."""
-    kb = build_knowledge(knowledge)
+    kb = build_knowledge(db, knowledge)
     path = file.storage_path
 
     # Agno's newer Knowledge class exposes add_content(path=...).
