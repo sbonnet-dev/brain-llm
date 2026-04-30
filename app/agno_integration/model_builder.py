@@ -75,11 +75,34 @@ def _normalize_model_params(
     return cleaned
 
 
+_OLLAMA_TOP_LEVEL_KWARGS = {
+    "format",
+    "options",
+    "keep_alive",
+    "request_params",
+    "host",
+    "timeout",
+    "api_key",
+    "client_params",
+}
+
+
 def _build_ollama(provider: Provider, model_id: str, params: dict[str, Any]) -> Any:
-    """Build an Ollama-backed Agno model."""
+    """Build an Ollama-backed Agno model.
+
+    Generation params (``temperature``, ``num_ctx``, ``num_predict``, ``top_p``,
+    ``top_k`` …) are not constructor kwargs on ``Ollama`` — they must be passed
+    inside ``options``. Split them out here.
+    """
     from agno.models.ollama import Ollama  # type: ignore
 
-    return Ollama(id=model_id, host=provider.base_url, **params)
+    top_level = {k: v for k, v in params.items() if k in _OLLAMA_TOP_LEVEL_KWARGS}
+    options = {k: v for k, v in params.items() if k not in _OLLAMA_TOP_LEVEL_KWARGS}
+    if options:
+        existing = top_level.get("options") or {}
+        top_level["options"] = {**existing, **options}
+
+    return Ollama(id=model_id, host=provider.base_url, **top_level)
 
 
 def _build_vllm(provider: Provider, model_id: str, params: dict[str, Any]) -> Any:
