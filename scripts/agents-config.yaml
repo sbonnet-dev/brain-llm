@@ -69,8 +69,8 @@ knowledges:
     samples_dir: kb-samples
     embedder:
       provider: ollama
-      model: qwen3-embedding:8b
-      host: https://ollama.antemeta.ai
+      model: qwen3-embedding:0.6b
+      host: http://localhost:11434
 
 agents:
   - name: MistralAssistant

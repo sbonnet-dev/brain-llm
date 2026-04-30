@@ -74,15 +74,12 @@ def build_embedder(config: dict | None) -> Any | None:
 
         return OllamaEmbedder(id=model, **cfg)
 
-    if provider == "openai":
+    if provider in {"openai", "mistral", "openai_compatible", "vllm"}:
         from agno.knowledge.embedder.openai import OpenAIEmbedder  # type: ignore
 
-        return OpenAIEmbedder(id=model, **cfg)
-
-    if provider in {"mistral", "openai_compatible"}:
-        # Mistral exposes an OpenAI-compatible embeddings API.
-        from agno.knowledge.embedder.openai import OpenAIEmbedder  # type: ignore
-
+        # AdminLLM passes the provider URL as `host`; Agno's OpenAIEmbedder expects `base_url`.
+        if "host" in cfg and "base_url" not in cfg:
+            cfg["base_url"] = cfg.pop("host")
         return OpenAIEmbedder(id=model, **cfg)
 
     logger.warning("Unknown embedder provider '%s' — falling back to default", provider)
