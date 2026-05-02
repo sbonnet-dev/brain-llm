@@ -10,6 +10,7 @@ from app.api.v1 import (
     postman,
     provider_types,
     providers,
+    sessions,
     teams,
     tools,
 )
@@ -23,4 +24,5 @@ router.include_router(tools.router)
 router.include_router(knowledges.router)
 router.include_router(agents.router)
 router.include_router(teams.router)
+router.include_router(sessions.router)
 router.include_router(postman.router)

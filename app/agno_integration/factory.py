@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.agno_integration.knowledge_builder import build_knowledge
 from app.agno_integration.model_builder import build_model
+from app.agno_integration.storage_builder import get_session_db
 from app.agno_integration.tool_builder import build_tool
 from app.core.exceptions import NotFoundError
 from app.core.logging_config import get_logger
@@ -48,6 +49,9 @@ def build_agno_agent(db: Session, agent_row: AgentModel) -> Any:
         model=model,
         tools=tools or None,
         knowledge=knowledge,
+        db=get_session_db(),
+        add_history_to_context=True,
+        num_history_runs=10,
         **kwargs,
     )
 
@@ -85,6 +89,7 @@ def build_agno_team(db: Session, team_row: TeamModel) -> Any:
         model=leader_model,
         tools=tools or None,
         knowledge=knowledge,
+        db=get_session_db(),
         **kwargs,
     )
 
