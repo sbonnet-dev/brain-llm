@@ -1,9 +1,14 @@
 """Chat sessions REST API."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.common import ErrorResponse
-from app.schemas.session import SessionDeleteResponse, SessionHistory, SessionSummary
+from app.schemas.session import (
+    SessionDeleteResponse,
+    SessionHistory,
+    SessionRenameRequest,
+    SessionSummary,
+)
 from app.services import session_service
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -46,3 +51,17 @@ def get_session_history(session_id: str) -> SessionHistory:
 def delete_session(session_id: str) -> SessionDeleteResponse:
     """Delete ``session_id`` and its full memory."""
     return session_service.delete_session(session_id=session_id)
+
+
+@router.patch(
+    "/{session_id}",
+    response_model=SessionSummary,
+    responses=_ERROR_RESPONSES,
+    summary="Rename a chat session",
+)
+def rename_session(session_id: str, payload: SessionRenameRequest) -> SessionSummary:
+    """Set a custom display title for ``session_id``."""
+    try:
+        return session_service.rename_session(session_id=session_id, title=payload.title)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

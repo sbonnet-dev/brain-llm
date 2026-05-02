@@ -42,3 +42,9 @@ class SessionDeleteResponse(BaseModel):
 
     session_id: str
     deleted: bool = True
+
+
+class SessionRenameRequest(BaseModel):
+    """Body sent to rename a session."""
+
+    title: str = Field(..., min_length=1, max_length=200)

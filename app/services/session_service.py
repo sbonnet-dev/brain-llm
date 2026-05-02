@@ -66,6 +66,36 @@ def delete_session(session_id: str) -> SessionDeleteResponse:
     return SessionDeleteResponse(session_id=session_id, deleted=True)
 
 
+def rename_session(session_id: str, title: str) -> SessionSummary:
+    """Persist a custom ``title`` on ``session_id``."""
+    cleaned = title.strip()
+    if not cleaned:
+        raise ValueError("Title cannot be empty")
+
+    db = get_session_db()
+    for kind, session_type in _kinds():
+        try:
+            session = db.get_session(session_id=session_id, session_type=session_type)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Failed to load %s session %s: %s", kind, session_id, exc)
+            session = None
+        if session is None:
+            continue
+        data = getattr(session, "session_data", None)
+        if not isinstance(data, dict):
+            data = {}
+        data["session_name"] = cleaned
+        session.session_data = data
+        try:
+            updated = db.upsert_session(session=session)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Failed to rename %s session %s: %s", kind, session_id, exc)
+            updated = None
+        if updated is not None:
+            return _to_summary(kind, updated)
+    raise NotFoundError(f"Session {session_id} not found")
+
+
 def _to_summary(kind: str, session: Any) -> SessionSummary:
     messages = _extract_messages(session)
     return SessionSummary(
@@ -73,7 +103,7 @@ def _to_summary(kind: str, session: Any) -> SessionSummary:
         user_id=_str_or_none(getattr(session, "user_id", None)),
         entity_id=_entity_id(session, kind),
         kind=kind,
-        title=_build_title(messages),
+        title=_session_name(session) or _build_title(messages),
         created_at=_int_or_none(getattr(session, "created_at", None)),
         updated_at=_int_or_none(getattr(session, "updated_at", None)),
     )
@@ -150,6 +180,17 @@ def _build_title(messages: list[SessionMessage]) -> str:
 def _entity_id(session: Any, kind: str) -> str | None:
     attr = "agent_id" if kind == "agent" else "team_id"
     return _str_or_none(getattr(session, attr, None))
+
+
+def _session_name(session: Any) -> str | None:
+    data = getattr(session, "session_data", None)
+    if not isinstance(data, dict):
+        return None
+    name = data.get("session_name")
+    if not isinstance(name, str):
+        return None
+    cleaned = name.strip()
+    return cleaned or None
 
 
 def _str_or_none(value: Any) -> str | None:
