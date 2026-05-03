@@ -52,6 +52,7 @@ def build_agno_agent(db: Session, agent_row: AgentModel) -> Any:
         db=get_session_db(),
         add_history_to_context=True,
         num_history_runs=10,
+        telemetry=False,
         **kwargs,
     )
 
@@ -90,6 +91,7 @@ def build_agno_team(db: Session, team_row: TeamModel) -> Any:
         tools=tools or None,
         knowledge=knowledge,
         db=get_session_db(),
+        telemetry=False,
         **kwargs,
     )
 
