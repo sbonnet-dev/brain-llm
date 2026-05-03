@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from sqlalchemy import update
+
 from app.agno_integration.storage_builder import get_session_db
 from app.core.exceptions import NotFoundError
 from app.core.logging_config import get_logger
@@ -67,12 +69,16 @@ def delete_session(session_id: str) -> SessionDeleteResponse:
 
 
 def rename_session(session_id: str, title: str) -> SessionSummary:
-    """Persist a custom ``title`` on ``session_id``."""
+    """Persist a custom ``title`` on ``session_id`` without touching ``updated_at``."""
     cleaned = title.strip()
     if not cleaned:
         raise ValueError("Title cannot be empty")
 
     db = get_session_db()
+    table = db._get_table(table_type="sessions")
+    if table is None:
+        raise NotFoundError(f"Session {session_id} not found")
+
     for kind, session_type in _kinds():
         try:
             session = db.get_session(session_id=session_id, session_type=session_type)
@@ -82,17 +88,20 @@ def rename_session(session_id: str, title: str) -> SessionSummary:
         if session is None:
             continue
         data = getattr(session, "session_data", None)
-        if not isinstance(data, dict):
-            data = {}
+        data = dict(data) if isinstance(data, dict) else {}
         data["session_name"] = cleaned
-        session.session_data = data
         try:
-            updated = db.upsert_session(session=session)
+            with db.Session() as sess, sess.begin():
+                sess.execute(
+                    update(table)
+                    .where(table.c.session_id == session_id)
+                    .values(session_data=data)
+                )
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Failed to rename %s session %s: %s", kind, session_id, exc)
-            updated = None
-        if updated is not None:
-            return _to_summary(kind, updated)
+            continue
+        session.session_data = data
+        return _to_summary(kind, session)
     raise NotFoundError(f"Session {session_id} not found")
 
 
