@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class SuggestionBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=256)
     icon: str | None = Field(None, max_length=128)
+    color: str | None = Field(None, max_length=32)
     prompt: str = Field(..., min_length=1)
 
 

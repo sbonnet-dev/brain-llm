@@ -78,7 +78,7 @@ def _replace_suggestions(
     """Delete existing suggestions for the agent and insert the new ones."""
     db.query(Suggestion).filter(Suggestion.agent_id == agent.id).delete()
     for s in suggestions or []:
-        db.add(Suggestion(agent_id=agent.id, title=s.title, icon=s.icon, prompt=s.prompt))
+        db.add(Suggestion(agent_id=agent.id, title=s.title, icon=s.icon, color=s.color, prompt=s.prompt))
     db.commit()
     db.refresh(agent)
 

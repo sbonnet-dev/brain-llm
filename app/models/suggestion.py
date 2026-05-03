@@ -17,4 +17,5 @@ class Suggestion(Base):
     )
     title: Mapped[str] = mapped_column(String(256), nullable=False)
     icon: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(32), nullable=True)
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
