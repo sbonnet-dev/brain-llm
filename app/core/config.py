@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     knowledge_default_embedder_provider: str = "ollama"
     knowledge_default_embedder_model: str = "qwen3-embedding:0.6b"
 
+    # Extracter service (Apache Tika REST abstraction) used to pull text and
+    # token-bounded chunks out of any file type (pdf, docx, pptx, xlsx, …)
+    # before sending them to the embedder.
+    extracter_url: str = "http://localhost:9002"
+    extracter_api_key: str | None = None
+    extracter_chunk_size: int = 1000
+    extracter_chunk_overlap: int = 100
+    extracter_timeout_s: float = 120.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

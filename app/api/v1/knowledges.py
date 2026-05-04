@@ -17,6 +17,7 @@ from app.schemas.common import DeleteResponse, ErrorResponse
 from app.schemas.knowledge import (
     IngestionResult,
     KnowledgeCreate,
+    KnowledgeFileChunk,
     KnowledgeFileContent,
     KnowledgeFileContentUpdate,
     KnowledgeFileRead,
@@ -208,6 +209,17 @@ def get_file_source(kb_id: int, file_id: int, db: Session = Depends(get_db)) -> 
     media_type = kf.mime_type or "application/octet-stream"
     headers = {"Content-Disposition": f'attachment; filename="{kf.filename}"'}
     return Response(content=data, media_type=media_type, headers=headers)
+
+
+@router.get(
+    "/bases/{kb_id}/files/{file_id}/chunks",
+    response_model=list[KnowledgeFileChunk],
+    responses=_ERROR_RESPONSES,
+    summary="List Chunks for a File",
+    tags=["Knowledge Files"],
+)
+def list_file_chunks(kb_id: int, file_id: int, db: Session = Depends(get_db)) -> list[KnowledgeFileChunk]:
+    return [KnowledgeFileChunk(**c) for c in knowledge_file_service.list_chunks(db, kb_id, file_id)]
 
 
 # ---------------------------------------------------------------------------

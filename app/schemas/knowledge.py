@@ -102,6 +102,15 @@ class KnowledgeFileContent(BaseModel):
     content: str
 
 
+class KnowledgeFileChunk(BaseModel):
+    """A single chunk indexed in the vector store for a knowledge file."""
+
+    chunk_index: int
+    token_count: int = 0
+    content: str
+    name: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Status types & ingestion
 # ---------------------------------------------------------------------------

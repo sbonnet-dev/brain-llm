@@ -182,25 +182,106 @@ def build_knowledge(db: Session, knowledge: Knowledge) -> Any:
 
 
 def ingest_file_into_kb(db: Session, knowledge: Knowledge, file: KnowledgeFile) -> None:
-    """Load ``file`` into the KB's vector store."""
-    kb = build_knowledge(db, knowledge)
-    path = file.storage_path
+    """Index one file into the KB's vector store.
 
-    # Agno's newer Knowledge class exposes add_content(path=...).
-    if hasattr(kb, "add_content"):
-        kb.add_content(path=path, name=file.filename)
-        return
-
-    # Fall back to the older `.load()` style used by *KnowledgeBase classes.
-    if hasattr(kb, "load_document"):
-        kb.load_document(path=path)
-        return
-    if hasattr(kb, "load"):
-        kb.path = path  # type: ignore[attr-defined]
-        kb.load(recreate=False, upsert=True)  # type: ignore[attr-defined]
-        return
-
-    raise ValidationError(
-        "The installed Agno version does not expose a supported ingestion API "
-        "(expected Knowledge.add_content or *KnowledgeBase.load)."
+    The file is sent to the Extracter microservice to produce cleaned text
+    and token-bounded chunks (pdf, docx, pptx, xlsx, txt, md, csv, …). Each
+    chunk becomes a Document, is embedded with the KB's embedder, and is
+    upserted into the configured vector DB.
+    """
+    Document = _resolve_document_class()
+    from app.services.extracter_client import extract_chunks
+    from app.services.knowledge_service import (
+        resolve_embedder_config,
+        resolve_vector_db_config,
     )
+
+    extraction = extract_chunks(file.storage_path, filename=file.filename)
+    if not extraction.chunks:
+        logger.warning(
+            "Extracter returned no chunks for file id=%s (%s) — skipping ingestion",
+            file.id,
+            file.filename,
+        )
+        return
+
+    vector_cfg = resolve_vector_db_config(knowledge)
+    embedder_cfg = resolve_embedder_config(db, knowledge)
+    embedder = build_embedder(embedder_cfg)
+    if embedder is not None:
+        vector_cfg["embedder"] = embedder
+
+    vector_db = build_vector_db(vector_cfg)
+
+    # Make sure the collection exists (create() is a no-op if it does).
+    if hasattr(vector_db, "create"):
+        try:
+            vector_db.create()
+        except Exception as exc:  # pragma: no cover - external service
+            logger.warning("Could not ensure vector collection exists: %s", exc)
+
+    documents = [
+        Document(
+            id=f"kb{knowledge.id}_f{file.id}_c{c.index}",
+            name=f"{file.filename}#chunk{c.index}",
+            content=c.text,
+            meta_data={
+                "knowledge_id": knowledge.id,
+                "file_id": file.id,
+                "filename": file.filename,
+                "chunk_index": c.index,
+                "token_count": c.token_count,
+            },
+        )
+        for c in extraction.chunks
+        if c.text.strip()
+    ]
+    if not documents:
+        logger.warning(
+            "All extracted chunks were empty for file id=%s (%s) — nothing to ingest",
+            file.id,
+            file.filename,
+        )
+        return
+
+    content_hash = extraction.sha256 or f"file_{file.id}_{file.size_bytes}"
+    filters = {"knowledge_id": knowledge.id, "file_id": file.id}
+
+    upsert_available = (
+        hasattr(vector_db, "upsert_available") and callable(vector_db.upsert_available)
+        and vector_db.upsert_available()
+    )
+    if upsert_available and hasattr(vector_db, "upsert"):
+        vector_db.upsert(content_hash, documents, filters)
+    elif hasattr(vector_db, "insert"):
+        vector_db.insert(content_hash, documents=documents, filters=filters)
+    else:
+        raise ValidationError(
+            "Configured vector DB does not expose insert/upsert; cannot ingest chunks."
+        )
+
+    logger.info(
+        "Ingested %d chunks into KB %s for file %s (%s)",
+        len(documents),
+        knowledge.id,
+        file.id,
+        file.filename,
+    )
+
+
+def _resolve_document_class():
+    """Locate Agno's Document dataclass across versions."""
+    try:
+        from agno.knowledge.document.base import Document  # type: ignore
+
+        return Document
+    except ImportError:
+        pass
+    try:
+        from agno.knowledge.document import Document  # type: ignore
+
+        return Document
+    except ImportError as exc:  # pragma: no cover - defensive
+        raise ValidationError(
+            "Agno Document class not found; cannot ingest chunks into the vector store."
+        ) from exc

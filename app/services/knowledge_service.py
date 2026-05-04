@@ -195,6 +195,65 @@ class KnowledgeFileService:
         db.commit()
         return file_id
 
+    def list_chunks(self, db: Session, kb_id: int, file_id: int) -> list[dict]:
+        """Return the chunks indexed in the vector store for ``file_id``."""
+        kf = self.get(db, kb_id, file_id)
+        kb = knowledge_service.get(db, kb_id)
+        if not kb.collection_name:
+            return []
+
+        settings = get_settings()
+        try:
+            from qdrant_client import QdrantClient  # type: ignore
+            from qdrant_client.http import models as qmodels  # type: ignore
+        except ImportError:  # pragma: no cover
+            logger.warning("qdrant-client not installed — cannot list chunks")
+            return []
+
+        url = os.environ.get("QDRANT_URL", settings.qdrant_url)
+        api_key = os.environ.get("QDRANT_API_KEY") or settings.qdrant_api_key
+        client = QdrantClient(url=url, api_key=api_key or None)
+
+        if not client.collection_exists(kb.collection_name):
+            return []
+
+        scroll_filter = qmodels.Filter(
+            must=[
+                qmodels.FieldCondition(
+                    key="meta_data.file_id",
+                    match=qmodels.MatchValue(value=kf.id),
+                )
+            ]
+        )
+
+        chunks: list[dict] = []
+        next_offset: Any = None
+        while True:
+            points, next_offset = client.scroll(
+                collection_name=kb.collection_name,
+                scroll_filter=scroll_filter,
+                limit=200,
+                with_payload=True,
+                with_vectors=False,
+                offset=next_offset,
+            )
+            for p in points:
+                payload = p.payload or {}
+                meta = payload.get("meta_data") or {}
+                chunks.append(
+                    {
+                        "chunk_index": int(meta.get("chunk_index", 0) or 0),
+                        "token_count": int(meta.get("token_count", 0) or 0),
+                        "content": payload.get("content", "") or "",
+                        "name": payload.get("name"),
+                    }
+                )
+            if next_offset is None:
+                break
+
+        chunks.sort(key=lambda c: c["chunk_index"])
+        return chunks
+
 
 knowledge_file_service = KnowledgeFileService()
 
