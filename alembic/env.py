@@ -22,6 +22,7 @@ from app.models import (  # noqa: F401
     knowledge,
     model,
     provider,
+    skill,
     suggestion,
     team,
     tool,

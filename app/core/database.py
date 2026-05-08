@@ -79,6 +79,7 @@ def init_db() -> None:
         knowledge,
         model,
         provider,
+        skill,
         suggestion,
         team,
         tool,
