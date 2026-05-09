@@ -4,11 +4,14 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     agents,
-    inference,
     knowledges,
+    model_types,
+    models,
     postman,
     provider_types,
     providers,
+    sessions,
+    skills,
     teams,
     tools,
 )
@@ -16,9 +19,12 @@ from app.api.v1 import (
 router = APIRouter(prefix="/api/v1")
 router.include_router(provider_types.router)
 router.include_router(providers.router)
+router.include_router(model_types.router)
+router.include_router(models.router)
 router.include_router(tools.router)
 router.include_router(knowledges.router)
+router.include_router(skills.router)
 router.include_router(agents.router)
 router.include_router(teams.router)
-router.include_router(inference.router)
+router.include_router(sessions.router)
 router.include_router(postman.router)

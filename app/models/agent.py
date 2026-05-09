@@ -1,11 +1,17 @@
 """Agent ORM model."""
 
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.suggestion import Suggestion
 
 
 class Agent(Base):
@@ -19,10 +25,9 @@ class Agent(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    provider_id: Mapped[int] = mapped_column(
-        ForeignKey("providers.id", ondelete="RESTRICT"), nullable=False
+    model_id: Mapped[int] = mapped_column(
+        ForeignKey("models.id", ondelete="CASCADE"), nullable=False
     )
-    model: Mapped[str] = mapped_column(String(128), nullable=False)
 
     # Lists of tool ids and knowledge ids attached to this agent.
     tool_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -30,6 +35,10 @@ class Agent(Base):
 
     # Arbitrary Agno Agent kwargs (markdown, show_tool_calls, ...).
     extra_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    suggestions: Mapped[list["Suggestion"]] = relationship(  # noqa: F821
+        "Suggestion", cascade="all, delete-orphan", lazy="selectin"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False

@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     # Logging configuration (configurable via LOG_LEVEL env var)
     log_level: str = "INFO"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    log_use_colors: bool = True
+    log_api_calls: bool = True
+    # Comma-separated list of logger names that are always silenced (set to WARNING),
+    # regardless of LOG_LEVEL. These produce binary/unreadable spam.
+    log_silenced_loggers: str = (
+        "hpack,hpack.hpack,hpack.table,h2,h2.connection,h2.stream,"
+        "httpcore,httpcore.http11,httpcore.http2,httpcore.connection,"
+        "httpx,urllib3,urllib3.connectionpool,asyncio,"
+        "agno.telemetry,openai._base_client,openai._client"
+    )
 
     # Persistence
     database_url: str = "sqlite:///./data/brain_llm.db"
@@ -28,6 +38,23 @@ class Settings(BaseSettings):
 
     # Used when generating the Postman collection
     public_base_url: str = "http://localhost:8000"
+
+    # Vector store (Qdrant) and knowledge-base file storage
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str | None = None
+    knowledge_storage_dir: str = "./data/knowledge"
+    tool_storage_dir: str = "./data/tools"
+    knowledge_default_embedder_provider: str = "ollama"
+    knowledge_default_embedder_model: str = "qwen3-embedding:0.6b"
+
+    # Extracter service (Apache Tika REST abstraction) used to pull text and
+    # token-bounded chunks out of any file type (pdf, docx, pptx, xlsx, …)
+    # before sending them to the embedder.
+    extracter_url: str = "http://localhost:9002"
+    extracter_api_key: str | None = None
+    extracter_chunk_size: int = 1000
+    extracter_chunk_overlap: int = 100
+    extracter_timeout_s: float = 120.0
 
     model_config = SettingsConfigDict(
         env_file=".env",

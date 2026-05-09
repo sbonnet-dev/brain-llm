@@ -12,17 +12,44 @@ services:
       APP_HOST: 0.0.0.0
       APP_PORT: 8000
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/brain_llm.db}
+      # Always point to the in-compose Postgres — ignore any local .env value.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-llm}:${POSTGRES_PASSWORD:-llm}@postgres:5432/${POSTGRES_DB:-llm_admin}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       VLLM_BASE_URL: ${VLLM_BASE_URL:-http://vllm:8000/v1}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      KNOWLEDGE_STORAGE_DIR: ${KNOWLEDGE_STORAGE_DIR:-/app/data/knowledge}
     volumes:
       - brain_llm_data:/app/data
     restart: unless-stopped
     depends_on:
-      - ollama
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+      qdrant:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: brain-llm-postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-llm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-llm}
+      POSTGRES_DB: ${POSTGRES_DB:-llm_admin}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-llm} -d ${POSTGRES_DB:-llm_admin}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   ollama:
     image: ollama/ollama:latest
@@ -33,6 +60,18 @@ services:
       - ollama_data:/root/.ollama
     restart: unless-stopped
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: brain-llm-qdrant
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
 volumes:
   brain_llm_data:
+  postgres_data:
   ollama_data:
+  qdrant_data:

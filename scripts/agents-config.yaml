@@ -1,0 +1,110 @@
+# brain-llm bootstrap configuration
+#
+# This file is the single source of truth for all scripts/*.py:
+#   0-clean-kb-agent.py — deletes the agent + KB declared below
+#   1-init-agents.py    — creates providers, models, knowledges, agents, teams
+#   2-init-kb-agent.py  — uploads sample files to the KB and triggers ingestion
+#   3-test-kb-agent.py  — runs the question(s) below against the KB-backed agent
+#
+# Re-running any script is safe: every resource is looked up by name first.
+
+providers:
+  - name: mistral
+    provider_type: openai_compatible  # ollama | vllm | openai_compatible
+    base_url: https://api.mistral.ai/v1/
+    api_key: A71WFyNG22SSsVcO40eo6Siw22
+    default_model: mistral-small-latest
+    description: Mistral AI — OpenAI-compatible endpoint
+
+  - name: ollama-local
+    provider_type: ollama
+    base_url: http://localhost:11434
+    default_model: llama3.2:latest
+    description: Local Ollama server
+
+  - name: ollama-external
+    provider_type: ollama
+    base_url: https://ollama.antemeta.ai
+    default_model: qwen3-coder:30b
+    description: External Ollama server
+
+models:
+  - name: mistral-small-latest
+    model_type: llm                   # llm | vlm | embedder | reranker | audio
+    provider: mistral
+    description: Mistral Small (latest) served via the Mistral API
+
+  - name: llama3.2:latest
+    model_type: llm
+    provider: ollama-local
+    description: Llama 3.2 (3B) served by Ollama
+
+  - name: qwen3.6:latest
+    model_type: llm
+    provider: ollama-local
+    description: Qwen 3.6 (3B) served by Ollama
+
+  - name: gpt-oss:latest
+    model_type: llm
+    provider: ollama-external
+    description: GPT OSS served by Ollama
+
+  - name: qwen3-embedding:0.6b
+    model_type: embedder
+    provider: ollama-local
+    description: Qwen3 Embedding (0.6B) — local Ollama
+
+  - name: qwen3-embedding:8b
+    model_type: embedder
+    provider: ollama-external
+    description: Qwen3 Embedding (8B) — external Ollama (used by KBs)
+
+# Knowledge bases. `embedder_model` references a row in `models[]` above
+# (matching by (model, provider) name pair); the script resolves it to an
+# `embedder_model_id` FK so provider/host/api_key/extra_config are all
+# inherited from that single source of truth.
+# `samples_dir` is resolved relative to this YAML file.
+knowledges:
+  - name: brain-llm-docs
+    description: Documentation indexed for the KB-backed assistant
+    samples_dir: kb-samples
+    embedder_model:
+      model: qwen3-embedding:0.6b
+      provider: ollama-local
+
+agents:
+  - name: MistralAssistant
+    role: General purpose assistant
+    description: Default assistant powered by mistral-small-latest
+    instructions: You are a helpful assistant. Answer concisely and accurately.
+    model: mistral-small-latest
+    provider: mistral
+
+  - name: Assistant
+    role: General purpose assistant
+    description: Default assistant powered by llama3.2:latest
+    instructions: You are a helpful assistant. Answer concisely and accurately.
+    model: llama3.2:latest
+    provider: ollama-local
+
+  - name: KBAssistant
+    role: Knowledge Base Assistant
+    description: Documentation assistant backed by the brain-llm-docs KB
+    instructions: >
+      Agis en tant que documentaliste
+    model: gpt-oss:latest
+    provider: ollama-external
+    knowledges:                       # resolved to knowledge_ids by init-agents
+      - brain-llm-docs
+    extra_config:
+      markdown: true
+      search_knowledge: true
+
+teams: []
+
+# Default questions used by 3-test-kb-agent.py when --question is not provided.
+# `agent` selects which agent in the agents[] list above answers them.
+test:
+  agent: KBAssistant
+  questions:
+    - "Quel est le nom du projet développé par kipcool ?"

@@ -69,6 +69,13 @@ class CRUDBase(Generic[ModelT, CreateT, UpdateT]):
         """Delete an item by id and return its id."""
         item = self.get(db, item_id)
         db.delete(item)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            logger.warning("Integrity error deleting %s: %s", self.resource_name, exc)
+            raise ConflictError(
+                f"Cannot delete {self.resource_name}: it is still referenced by other resources"
+            ) from exc
         logger.info("Deleted %s id=%s", self.resource_name, item_id)
         return item_id

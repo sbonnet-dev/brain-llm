@@ -9,11 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.agno_integration.knowledge_builder import build_knowledge
 from app.agno_integration.model_builder import build_model
+from app.agno_integration.storage_builder import get_session_db
 from app.agno_integration.tool_builder import build_tool
 from app.core.exceptions import NotFoundError
 from app.core.logging_config import get_logger
 from app.models.agent import Agent as AgentModel
 from app.models.knowledge import Knowledge
+from app.models.model import Model
 from app.models.provider import Provider
 from app.models.team import Team as TeamModel
 from app.models.tool import Tool
@@ -25,15 +27,16 @@ def build_agno_agent(db: Session, agent_row: AgentModel) -> Any:
     """Translate an Agent DB record into a runnable ``agno.agent.Agent``."""
     from agno.agent import Agent as AgnoAgent  # type: ignore
 
-    provider = db.get(Provider, agent_row.provider_id)
-    if provider is None:
-        raise NotFoundError(f"Provider id={agent_row.provider_id} not found for agent {agent_row.id}")
+    model_row = _must_get(db, Model, agent_row.model_id, "Model")
+    provider = _must_get(db, Provider, model_row.provider_id, "Provider")
 
-    model = build_model(provider, agent_row.model)
+    model = build_model(provider, model_row.name, model_row.extra_config)
     tools = _resolve_tools(db, agent_row.tool_ids or [])
     knowledge = _resolve_first_knowledge(db, agent_row.knowledge_ids or [])
 
     kwargs: dict[str, Any] = dict(agent_row.extra_config or {})
+    kwargs.pop("is_active", None)
+    kwargs.pop("group_ids", None)
     if agent_row.role is not None:
         kwargs.setdefault("role", agent_row.role)
     if agent_row.description is not None:
@@ -46,6 +49,10 @@ def build_agno_agent(db: Session, agent_row: AgentModel) -> Any:
         model=model,
         tools=tools or None,
         knowledge=knowledge,
+        db=get_session_db(),
+        add_history_to_context=True,
+        num_history_runs=10,
+        telemetry=False,
         **kwargs,
     )
 
@@ -60,13 +67,17 @@ def build_agno_team(db: Session, team_row: TeamModel) -> Any:
     ]
 
     leader_model = None
-    if team_row.provider_id is not None and team_row.model is not None:
-        leader_model = build_model(_must_get(db, Provider, team_row.provider_id, "Provider"), team_row.model)
+    if team_row.model_id is not None:
+        model_row = _must_get(db, Model, team_row.model_id, "Model")
+        provider = _must_get(db, Provider, model_row.provider_id, "Provider")
+        leader_model = build_model(provider, model_row.name, model_row.extra_config)
 
     tools = _resolve_tools(db, team_row.tool_ids or [])
     knowledge = _resolve_first_knowledge(db, team_row.knowledge_ids or [])
 
     kwargs: dict[str, Any] = dict(team_row.extra_config or {})
+    kwargs.pop("is_active", None)
+    kwargs.pop("group_ids", None)
     if team_row.description is not None:
         kwargs.setdefault("description", team_row.description)
     if team_row.instructions is not None:
@@ -79,6 +90,8 @@ def build_agno_team(db: Session, team_row: TeamModel) -> Any:
         model=leader_model,
         tools=tools or None,
         knowledge=knowledge,
+        db=get_session_db(),
+        telemetry=False,
         **kwargs,
     )
 
@@ -102,7 +115,7 @@ def _resolve_first_knowledge(db: Session, ids: list[int]) -> Any | None:
     """Return the first knowledge base referenced, if any."""
     if not ids:
         return None
-    return build_knowledge(_must_get(db, Knowledge, ids[0], "Knowledge"))
+    return build_knowledge(db, _must_get(db, Knowledge, ids[0], "Knowledge"))
 
 
 def _must_get(db: Session, model: type, item_id: int, name: str) -> Any:

@@ -7,7 +7,7 @@ described by a JSON schema.
 
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -29,7 +29,10 @@ class Tool(Base):
     reference: Mapped[str] = mapped_column(String(256), nullable=False)
 
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # Comma-separated list of pip packages required by this tool, e.g. "yfinance,duckduckgo-search".
+    # Installed automatically when the tool is created/updated and at service startup.
+    dependencies: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False

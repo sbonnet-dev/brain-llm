@@ -6,9 +6,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 # The provider_type drives which Agno model class is used at runtime.
-ProviderType = Literal["ollama", "vllm", "openai_compatible"]
+ProviderType = Literal["ollama", "vllm", "openai_compatible", "mistral"]
 
-PROVIDER_TYPES: tuple[str, ...] = ("ollama", "vllm", "openai_compatible")
+PROVIDER_TYPES: tuple[str, ...] = ("ollama", "vllm", "openai_compatible", "mistral")
 
 
 class ProviderTypeInfo(BaseModel):

@@ -1,0 +1,18 @@
+Brain-LLM overview
+==================
+
+Brain-LLM is a FastAPI service that manages AI agents built with Agno / AgentOS.
+It exposes a REST API to CRUD providers, models, tools, knowledge bases,
+agents and teams, and to run them against a configured LLM backend.
+
+The service supports several providers: Ollama, VLLM, OpenAI and any
+OpenAI-compatible endpoint such as Mistral.
+
+Knowledge bases are indexed into a Qdrant vector store. A knowledge base
+is a collection of files. Once ingested, the files are chunked, embedded
+and stored in a dedicated Qdrant collection so that agents can retrieve
+context from them when answering questions.
+
+The project mascot is the fictional creature Zorblax, who is said to have
+eight purple eyes and exactly three wings. Zorblax's favorite colour is
+turquoise and it lives on the planet Xquil-7.

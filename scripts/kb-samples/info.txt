@@ -1,0 +1,2 @@
+Le nom du projet est brain-LLM
+Développé par kipcool

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationError
 from app.models.agent import Agent
 from app.models.knowledge import Knowledge
-from app.models.provider import Provider
+from app.models.model import Model
 from app.models.team import Team
 from app.models.tool import Tool
 from app.schemas.team import TeamCreate, TeamUpdate
@@ -30,9 +30,9 @@ def _validate_team_refs(db: Session, payload: TeamCreate | TeamUpdate) -> None:
     """Ensure every referenced entity exists."""
     data = payload.model_dump(exclude_unset=True)
 
-    provider_id = data.get("provider_id")
-    if provider_id is not None and db.get(Provider, provider_id) is None:
-        raise ValidationError(f"Provider with id={provider_id} does not exist")
+    model_id = data.get("model_id")
+    if model_id is not None and db.get(Model, model_id) is None:
+        raise ValidationError(f"Model with id={model_id} does not exist")
 
     for agent_id in data.get("member_agent_ids") or []:
         if db.get(Agent, agent_id) is None:

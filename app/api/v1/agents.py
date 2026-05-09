@@ -1,12 +1,15 @@
 """Agents REST API."""
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.agent import AgentCreate, AgentRead, AgentUpdate
 from app.schemas.common import DeleteResponse, ErrorResponse
+from app.schemas.run import RunRequest, RunResponse
 from app.services.agent_service import agent_service
+from app.services.run_service import run_agent, stream_agent
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -14,6 +17,7 @@ _ERROR_RESPONSES = {
     400: {"model": ErrorResponse},
     404: {"model": ErrorResponse},
     409: {"model": ErrorResponse},
+    502: {"model": ErrorResponse},
 }
 
 
@@ -74,3 +78,31 @@ def update_agent(
 def delete_agent(agent_id: int, db: Session = Depends(get_db)) -> DeleteResponse:
     """Delete an agent by id."""
     return DeleteResponse(id=agent_service.delete(db, agent_id))
+
+
+@router.post(
+    "/{agent_id}/run",
+    response_model=RunResponse,
+    response_model_exclude_none=False,
+    responses=_ERROR_RESPONSES,
+    summary="Run an agent",
+    description=(
+        "Build the Agno agent from its stored configuration, send the message "
+        "to the configured LLM provider and return the generated answer "
+        "together with optional run metadata (run_id, metrics).\n\n"
+        "Set `stream: true` in the payload to receive the answer as a "
+        "Server-Sent-Events stream (content-type: text/event-stream)."
+    ),
+)
+def execute_agent(
+    agent_id: int,
+    payload: RunRequest,
+    db: Session = Depends(get_db),
+):
+    """Execute an agent and return the result (JSON or SSE stream)."""
+    if payload.stream:
+        return StreamingResponse(
+            stream_agent(db, agent_id, payload),
+            media_type="text/event-stream",
+        )
+    return run_agent(db, agent_id, payload)
