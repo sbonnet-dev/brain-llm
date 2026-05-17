@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import update
 
 from app.agno_integration.storage_builder import get_session_db
+from app.core.crypto import decrypt_text, encrypt_text, is_encrypted
 from app.core.exceptions import NotFoundError
 from app.core.logging_config import get_logger
 from app.schemas.session import (
@@ -89,7 +90,7 @@ def rename_session(session_id: str, title: str) -> SessionSummary:
             continue
         data = getattr(session, "session_data", None)
         data = dict(data) if isinstance(data, dict) else {}
-        data["session_name"] = cleaned
+        data["session_name"] = encrypt_text(cleaned)
         try:
             with db.Session() as sess, sess.begin():
                 sess.execute(
@@ -107,24 +108,29 @@ def rename_session(session_id: str, title: str) -> SessionSummary:
 
 def _to_summary(kind: str, session: Any) -> SessionSummary:
     messages = _extract_messages(session)
+    title = _session_name(session) or _build_title(messages)
     return SessionSummary(
         session_id=str(getattr(session, "session_id", "")),
         user_id=_str_or_none(getattr(session, "user_id", None)),
         entity_id=_entity_id(session, kind),
         kind=kind,
-        title=_session_name(session) or _build_title(messages),
+        title=encrypt_text(title),
         created_at=_int_or_none(getattr(session, "created_at", None)),
         updated_at=_int_or_none(getattr(session, "updated_at", None)),
     )
 
 
 def _to_history(kind: str, session: Any) -> SessionHistory:
+    encrypted_messages = [
+        SessionMessage(role=m.role, content=encrypt_text(m.content))
+        for m in _extract_messages(session)
+    ]
     return SessionHistory(
         session_id=str(getattr(session, "session_id", "")),
         user_id=_str_or_none(getattr(session, "user_id", None)),
         entity_id=_entity_id(session, kind),
         kind=kind,
-        messages=_extract_messages(session),
+        messages=encrypted_messages,
         created_at=_int_or_none(getattr(session, "created_at", None)),
         updated_at=_int_or_none(getattr(session, "updated_at", None)),
     )
@@ -198,6 +204,12 @@ def _session_name(session: Any) -> str | None:
     name = data.get("session_name")
     if not isinstance(name, str):
         return None
+    if is_encrypted(name):
+        try:
+            name = decrypt_text(name)
+        except Exception as exc:
+            logger.warning("Failed to decrypt session_name: %s", exc)
+            return None
     cleaned = name.strip()
     return cleaned or None
 

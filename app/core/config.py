@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Persistence
     database_url: str = "sqlite:///./data/brain_llm.db"
 
+    # Conversation encryption (AES-256-GCM). REQUIRED at runtime.
+    # Base64-encoded 32-byte key, identical to AdminLLM's value.
+    conversation_encryption_key: str | None = None
+
     # Default provider endpoints
     ollama_base_url: str = "http://localhost:11434"
     vllm_base_url: str = "http://localhost:8001/v1"
