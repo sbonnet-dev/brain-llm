@@ -11,6 +11,7 @@ from app.schemas.common import DeleteResponse, ErrorResponse
 from app.schemas.tool import ToolCreate, ToolRead, ToolUpdate
 from app.services.dependency_installer import install_dependencies
 from app.services.tool_service import (
+    list_tool_usage,
     read_tool_source,
     tool_service,
     tool_source_path,
@@ -45,6 +46,17 @@ def list_tools(
 def get_tool(tool_id: int, db: Session = Depends(get_db)) -> ToolRead:
     """Fetch a single tool by id."""
     return tool_service.get(db, tool_id)
+
+
+@router.get(
+    "/{tool_id}/usage",
+    responses=_ERROR_RESPONSES,
+    summary="List agents and teams referencing a tool",
+)
+def get_tool_usage(tool_id: int, db: Session = Depends(get_db)) -> dict:
+    """Return the agents and teams whose ``tool_ids`` includes this tool."""
+    tool_service.get(db, tool_id)
+    return list_tool_usage(db, tool_id)
 
 
 @router.post(
