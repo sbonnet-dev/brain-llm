@@ -6,6 +6,7 @@ whose name is ``kb.collection_name`` (``kb_{id}`` if unset).
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -15,6 +16,120 @@ from app.core.logging_config import get_logger
 from app.models.knowledge import Knowledge, KnowledgeFile
 
 logger = get_logger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Multi-KB wrapper
+# ---------------------------------------------------------------------------
+
+
+class MultiKnowledge:
+    """Aggregate several Agno ``Knowledge`` instances behind a single protocol.
+
+    Agno's ``Agent.knowledge`` is typed as a single ``KnowledgeProtocol``, so we
+    expose a wrapper that fans ``retrieve``/``aretrieve`` out to every attached
+    KB and merges the results by score. The protocol methods
+    (``build_context``, ``get_tools``, ``aget_tools``) are also delegated so
+    the agent's system prompt and tool list stay consistent.
+    """
+
+    def __init__(self, knowledges: list[Any]) -> None:
+        self.knowledges = list(knowledges)
+        names = [getattr(k, "name", None) for k in self.knowledges]
+        self.name = ", ".join(n for n in names if n) or "knowledge"
+
+    def build_context(self, enable_agentic_filters: bool = False, **_: Any) -> str:
+        blocks: list[str] = []
+        seen: set[str] = set()
+        for kb in self.knowledges:
+            fn = getattr(kb, "build_context", None)
+            if not callable(fn):
+                continue
+            ctx = fn(enable_agentic_filters=enable_agentic_filters)
+            if ctx and ctx not in seen:
+                seen.add(ctx)
+                blocks.append(ctx)
+        names = [getattr(k, "name", None) for k in self.knowledges]
+        names = [n for n in names if n]
+        if names:
+            blocks.append(
+                "<available_knowledge_bases>\n"
+                + "\n".join(f"- {n}" for n in names)
+                + "\n</available_knowledge_bases>"
+            )
+        return "\n".join(blocks)
+
+    def get_tools(self, **kwargs: Any) -> list[Any]:
+        tools: list[Any] = []
+        for kb in self.knowledges:
+            fn = getattr(kb, "get_tools", None)
+            if callable(fn):
+                tools.extend(fn(**kwargs) or [])
+        return tools
+
+    async def aget_tools(self, **kwargs: Any) -> list[Any]:
+        tools: list[Any] = []
+        for kb in self.knowledges:
+            if not hasattr(kb, "aget_tools"):
+                continue
+            result = await kb.aget_tools(**kwargs)
+            tools.extend(result or [])
+        return tools
+
+    def retrieve(
+        self,
+        query: str,
+        max_results: int | None = None,
+        filters: Any | None = None,
+        **kwargs: Any,
+    ) -> list[Any]:
+        results: list[Any] = []
+        for kb in self.knowledges:
+            fn = getattr(kb, "retrieve", None)
+            if not callable(fn):
+                continue
+            try:
+                docs = fn(query=query, max_results=max_results, filters=filters, **kwargs)
+            except Exception as exc:
+                logger.warning(
+                    "retrieve failed for KB '%s': %s", getattr(kb, "name", "?"), exc
+                )
+                continue
+            if docs:
+                results.extend(docs)
+        return _rank_and_cap(results, max_results)
+
+    async def aretrieve(
+        self,
+        query: str,
+        max_results: int | None = None,
+        filters: Any | None = None,
+        **kwargs: Any,
+    ) -> list[Any]:
+        async def _one(kb: Any) -> list[Any]:
+            if not hasattr(kb, "aretrieve"):
+                return []
+            try:
+                docs = await kb.aretrieve(
+                    query=query, max_results=max_results, filters=filters, **kwargs
+                )
+                return docs or []
+            except Exception as exc:
+                logger.warning(
+                    "aretrieve failed for KB '%s': %s", getattr(kb, "name", "?"), exc
+                )
+                return []
+
+        per_kb = await asyncio.gather(*(_one(kb) for kb in self.knowledges))
+        return _rank_and_cap([doc for batch in per_kb for doc in batch], max_results)
+
+
+def _rank_and_cap(docs: list[Any], max_results: int | None) -> list[Any]:
+    """Sort docs by score desc (when present) and truncate to ``max_results``."""
+    docs.sort(key=lambda d: getattr(d, "score", 0.0) or 0.0, reverse=True)
+    if max_results:
+        return docs[:max_results]
+    return docs
 
 
 # ---------------------------------------------------------------------------

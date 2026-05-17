@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.agno_integration.knowledge_builder import build_knowledge
+from app.agno_integration.knowledge_builder import MultiKnowledge, build_knowledge
 from app.agno_integration.model_builder import build_model
 from app.agno_integration.storage_builder import get_session_db
 from app.agno_integration.tool_builder import build_tool
@@ -32,7 +32,7 @@ def build_agno_agent(db: Session, agent_row: AgentModel) -> Any:
 
     model = build_model(provider, model_row.name, model_row.extra_config)
     tools = _resolve_tools(db, agent_row.tool_ids or [])
-    knowledge = _resolve_first_knowledge(db, agent_row.knowledge_ids or [])
+    knowledge = _resolve_knowledge(db, agent_row.knowledge_ids or [])
 
     kwargs: dict[str, Any] = dict(agent_row.extra_config or {})
     kwargs.pop("is_active", None)
@@ -73,7 +73,7 @@ def build_agno_team(db: Session, team_row: TeamModel) -> Any:
         leader_model = build_model(provider, model_row.name, model_row.extra_config)
 
     tools = _resolve_tools(db, team_row.tool_ids or [])
-    knowledge = _resolve_first_knowledge(db, team_row.knowledge_ids or [])
+    knowledge = _resolve_knowledge(db, team_row.knowledge_ids or [])
 
     kwargs: dict[str, Any] = dict(team_row.extra_config or {})
     kwargs.pop("is_active", None)
@@ -111,11 +111,16 @@ def _resolve_tools(db: Session, tool_ids: list[int]) -> list[Any]:
     return [build_tool(_must_get(db, Tool, tid, "Tool")) for tid in tool_ids]
 
 
-def _resolve_first_knowledge(db: Session, ids: list[int]) -> Any | None:
-    """Return the first knowledge base referenced, if any."""
+def _resolve_knowledge(db: Session, ids: list[int]) -> Any | None:
+    """Return one Agno Knowledge (single KB) or a ``MultiKnowledge`` fan-out."""
     if not ids:
         return None
-    return build_knowledge(db, _must_get(db, Knowledge, ids[0], "Knowledge"))
+    knowledges = [
+        build_knowledge(db, _must_get(db, Knowledge, kid, "Knowledge")) for kid in ids
+    ]
+    if len(knowledges) == 1:
+        return knowledges[0]
+    return MultiKnowledge(knowledges)
 
 
 def _must_get(db: Session, model: type, item_id: int, name: str) -> Any:
